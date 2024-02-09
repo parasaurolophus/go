@@ -15,18 +15,20 @@ ability for custom `error` types to inherit such a mechanism and inheritance --
 along with method overloading -- is another of the many incredibly useful
 language features introduced into programming languages during the 1970's with
 which Go has dispensed for, apparently, no better reason than that Go's
-designers do not understand why they were introduced in the first place.)
+designers do not understand why they were introduced in the first place or else
+believe that if a feature has ever been misused it must be excluded.)
 
 This wrapper provides an admittedly somewhat painful work-around. It defines a
-`stacktraces.StackTrace` interface which can be used as any place the `error`
-interface is used. Its "constructor," `stacktraces.New(msg string, skipFrames
-any)`, captures a stack trace at the time it is called using the same logic as
-`LongStackTrace(skipFrames any)` and `ShortStackTrace(skipFrames any)`. 
+`stacktraces.StackTrace` struct which implements the `error` interface. Its
+"constructor," `stacktraces.New(msg string, skipFrames any)`, captures a stack
+trace at the time it is called using the same logic as the helper methods
+`stacktraces.LongStackTrace(skipFrames any)` and
+`stacktraces.ShortStackTrace(skipFrames any)`. 
 
-Note that the "skip frames" feature is supplied so that programmers can exclude
-the first frames that always will be part of the call chain that does the stack
-frame formatting and overall logging. There are three options supported for the
-`skipFrames` parameter to the stack trace related functions:
+The "skip frames" feature is supplied so that programmers can exclude the first
+frames in call chains that always start with the stack frame formatting and
+overall logging library implementation. There are three options supported for
+the `skipFrames` parameter to the stack trace related functions:
 
 - If passed a string, the stack trace will exclude all frames up to a frame for
   the function with the given name.
@@ -34,7 +36,7 @@ frame formatting and overall logging. There are three options supported for the
 - If passed a non-negative number, the stack trace will omit the specified
   number of frames from the top of the call stack.
 
-- If passed a negative number, the stack trace will exclude all frames up to and
+- If any other value, the stack trace will exclude all frames up to and
   including the function which created the trace.
 
 For example, when called directly from `main.main`:
@@ -57,8 +59,8 @@ will print the following to `stdout`:
 
 ```
 main.main
-3:main.main [/source/go/scratch/scratch.go:14] < 4:runtime.main [/usr/local/go/src/runtime/proc.go:267] < 5:runtime.goexit [/usr/local/go/src/runtime/asm_arm64.s:1197]
-3:main.main [/source/go/scratch/scratch.go:17] < 4:runtime.main [/usr/local/go/src/runtime/proc.go:267] < 5:runtime.goexit [/usr/local/go/src/runtime/asm_arm64.s:1197]
+3:main.main [/source/go/scratch/scratch.go:29] < 4:runtime.main [/usr/local/go/src/runtime/proc.go:267] < 5:runtime.goexit [/usr/local/go/src/runtime/asm_arm64.s:1197]
+3:main.main [/source/go/scratch/scratch.go:32] < 4:runtime.main [/usr/local/go/src/runtime/proc.go:267] < 5:runtime.goexit [/usr/local/go/src/runtime/asm_arm64.s:1197]
 4:runtime.main [/usr/local/go/src/runtime/proc.go:267] < 5:runtime.goexit [/usr/local/go/src/runtime/asm_arm64.s:1197]
 ```
 
@@ -143,28 +145,11 @@ func New(msg string, skipFrames any) StackTrace
       - If skipFrames is a non-negative int the specified number of frames are
         skipped.
 
-      - If skipFrames is a negative int all frames up to and including this
-        function's frame are skipped.
-
       - If skipFrames is a string all frames before the frame for the function
         with the given name are skipped.
 
-    For example:
-
-      - stacktraces.New("some message", 0) returns the entire calling stack
-        starting with an invocation of runtime.Callers within the implementation
-        of this library.
-
-      - stacktraces.New("some message", 5) omits the first 5 frames.
-
-      - stacktraces.New("some message", -1) omits all frames up to and including
-        the frame for the invocation of New, itself.
-
-      - stacktraces.New("some message", "Foo") omits all frames before the
-        invocation of Foo().
-
-      - stacktraces.New("some message", 1.0) behaves exactly like
-        stacktraces.New("some message", 0).
+      - If skipFrames is any other value, all frames up to and including this
+        function's frame are skipped.
 
     The empty string is returned if the stack depth is exceeded when passing a
     positive int or no matching frame is found when passing a string.
@@ -176,5 +161,4 @@ func (t StackTrace) LongTrace() string
     Return the multi-line representation of this stack trace.
 
 func (t StackTrace) ShortTrace() string
-    Return the one-line representation of this stack trace.
 ```

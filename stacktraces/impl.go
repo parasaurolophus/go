@@ -121,6 +121,11 @@ func formatStackTrace(skipFrames any, longFormatter stackFrameFormatter, shortFo
 
 	case string:
 		frameTest = startWhenSeen(v)
+
+	default:
+		// the number of frames to skip is empirically derived and may
+		// change any time the code in this library is refactored
+		skip = 3
 	}
 
 	pc := make([]uintptr, 1024)
@@ -161,7 +166,7 @@ func formatStackTrace(skipFrames any, longFormatter stackFrameFormatter, shortFo
 	return longBuffer.String(), shortBuffer.String()
 }
 
-// Return a function that returns true when invoked for a frame the given
+// Return a function that returns true when invoked for a frame with the given
 // function name and all that follow it.
 //
 // This is the frame test used by formatStackTrace() when skipFrames is a string
