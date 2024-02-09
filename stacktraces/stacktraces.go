@@ -59,28 +59,11 @@ func FunctionName() string {
 //   - If skipFrames is a non-negative int the specified number of frames are
 //     skipped.
 //
-//   - If skipFrames is a negative int all frames up to and including this
-//     function's frame are skipped.
-//
 //   - If skipFrames is a string all frames before the frame for the function
 //     with the given name are skipped.
 //
-// For example:
-//
-//   - stacktraces.New("some message", 0) returns the entire calling stack
-//     starting with an invocation of runtime.Callers within the implementation
-//     of this library.
-//
-//   - stacktraces.New("some message", 5) omits the first 5 frames.
-//
-//   - stacktraces.New("some message", -1) omits all frames up to and including
-//     the frame for the invocation of New, itself.
-//
-//   - stacktraces.New("some message", "Foo") omits all frames before the
-//     invocation of Foo().
-//
-//   - stacktraces.New("some message", 1.0) behaves exactly like
-//     stacktraces.New("some message", 0).
+//   - If skipFrames is any other value, all frames up to and including this
+//     function's frame are skipped.
 //
 // The empty string is returned if the stack depth is exceeded when passing a
 // positive int or no matching frame is found when passing a string.
@@ -107,10 +90,14 @@ func New(msg string, skipFrames any) StackTrace {
 		}
 
 	case string:
+
 		long, short = formatStackTrace(v, longFormatter, shortFormatter)
 
 	default:
-		long, short = formatStackTrace(0, longFormatter, shortFormatter)
+
+		// the number of frames to skip is empirically derived and may
+		// change as a result of any refactoring of this library's code
+		long, short = formatStackTrace(3, longFormatter, shortFormatter)
 	}
 
 	return StackTrace{
