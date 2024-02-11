@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"slices"
@@ -63,9 +64,144 @@ func TestAlways(t *testing.T) {
 	}
 
 	logger := New(writer, &options)
-	ctx := context.Background()
 	counters.Error1 += 1
 	logger.Always(
+		func() string {
+			builderCalled = true
+			return "always"
+		},
+		STACKTRACE, nil,
+		TAGS, additionalTags,
+		"foo", "bar")
+
+	writer.Flush()
+	bytes := buffer.Bytes()
+
+	type logEntry struct {
+		Time       string   `json:"time"`
+		Verbosity  string   `json:"verbosity"`
+		Msg        string   `json:"msg"`
+		Counters   Counters `json:"counters"`
+		StackTrace string   `json:"stacktrace"`
+		Tags       []string `json:"tags"`
+		Foo        string   `json:"foo"`
+	}
+
+	entry := logEntry{}
+	err := json.Unmarshal(bytes, &entry)
+
+	if err != nil {
+		t.Fatalf("TestAlways: error unmarshaling log entry; %s", err.Error())
+	}
+
+	if !replacerCalled {
+		t.Fatalf("TestAlways: expected attribute replacer to have been called")
+	}
+
+	if !builderCalled {
+		t.Fatalf("TestAlways: expected message builder to havve been called")
+	}
+
+	_, err = time.Parse(time.RFC3339Nano, entry.Time)
+
+	if err != nil {
+		t.Fatalf(
+			"TestAlways: error parsing time '%s'; %s",
+			entry.Time,
+			err.Error())
+	}
+
+	if entry.Verbosity != "ALWAYS" {
+		t.Fatalf(
+			"TestAlways: expected verbosity to be 'ALWAYS', got '%s'",
+			entry.Verbosity)
+	}
+
+	if entry.Msg != "always" {
+		t.Fatalf(
+			"TestAlways: expected msg to be 'always', got '%s'",
+			entry.Msg)
+	}
+
+	if entry.Counters.Error1 != 1 {
+		t.Fatalf(
+			"TestAlways: expected Error1 to be 1, got %d",
+			entry.Counters.Error1)
+	}
+
+	if entry.Counters.Error2 != 0 {
+		t.Fatalf(
+			"TestAlways: expected Error2 to be 0, got %d",
+			entry.Counters.Error2)
+	}
+
+	name, _, err := firstFunction(entry.StackTrace)
+
+	if err != nil {
+		t.Fatalf("TestAlways: error parsing stack frames; %s", err.Error())
+	}
+
+	functionName := stacktraces.FunctionName()
+
+	if name != functionName {
+		t.Fatalf("TestAlways: expected first stack frame to be for '%s', got '%s'", functionName, name)
+	}
+
+	if entry.StackTrace == "" {
+		t.Fatalf("TestAlways: expected stack trace not to be empty")
+	}
+
+	combinedTags := append(baseTags, additionalTags...)
+
+	if len(entry.Tags) != len(combinedTags) {
+		t.Fatalf("TestAlways: expected length of %#v to be 2, got %d", entry.Tags, len(entry.Tags))
+	}
+
+	for _, val := range combinedTags {
+
+		if !slices.Contains[[]string](entry.Tags, val) {
+			t.Fatalf("TestAlwas: expected %#v to contain '%s'", entry.Tags, val)
+		}
+	}
+
+	if entry.Foo != "bar" {
+		t.Fatalf("TestAlways: expected foo to be 'bar', got '%s'", entry.Foo)
+	}
+}
+
+func TestAlwaysContext(t *testing.T) {
+
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+
+	type Counters struct {
+		Error1 uint `json:"error1"`
+		Error2 uint `json:"error2"`
+	}
+
+	counters := Counters{
+		Error1: 0,
+		Error2: 0,
+	}
+
+	replacerCalled := false
+	builderCalled := false
+
+	baseTags := []string{"base"}
+	additionalTags := []string{"additional"}
+	options := LoggerOptions{
+		BaseAttributes: []any{"counters", &counters},
+		BaseTags:       baseTags,
+		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
+			replacerCalled = true
+			return a
+		},
+	}
+
+	logger := New(writer, &options)
+	ctx := context.Background()
+	counters.Error1 += 1
+	logger.AlwaysContext(
 		ctx,
 		func() string {
 			builderCalled = true
@@ -136,12 +272,13 @@ func TestAlways(t *testing.T) {
 			entry.Counters.Error2)
 	}
 
-	functionName := stacktraces.FunctionName()
 	name, _, err := firstFunction(entry.StackTrace)
 
 	if err != nil {
 		t.Fatalf("TestAlways: error parsing stack frames; %s", err.Error())
 	}
+
+	functionName := stacktraces.FunctionName()
 
 	if name != functionName {
 		t.Fatalf("TestAlways: expected first stack frame to be for '%s', got '%s'", functionName, name)
@@ -191,8 +328,7 @@ func TestNilBuilder(t *testing.T) {
 	logger := New(writer, &options)
 	logger.SetBaseAttributes("counters", &counters)
 	counters.Error1 += 1
-	ctx := context.Background()
-	logger.Always(ctx, nil, STACKTRACE, nil)
+	logger.Always(nil, STACKTRACE, nil)
 
 	writer.Flush()
 	bytes := buffer.Bytes()
@@ -211,7 +347,7 @@ func TestNilBuilder(t *testing.T) {
 
 	if err != nil {
 		t.Fatalf(
-			"TestNilBuilder: error unmarshaling log entry; %s",
+			"error unmarshaling log entry; %s",
 			err.Error())
 	}
 
@@ -219,52 +355,53 @@ func TestNilBuilder(t *testing.T) {
 
 	if err != nil {
 		t.Fatalf(
-			"TestNilBuilder: error parsing time '%s'; %s",
+			"error parsing time '%s'; %s",
 			entry.Time,
 			err.Error())
 	}
 
 	if entry.Verbosity != "ALWAYS" {
 		t.Fatalf(
-			"TestNilBuilder: expected verbosity to be 'ALWAYS', got '%s'",
+			"expected verbosity to be 'ALWAYS', got '%s'",
 			entry.Verbosity)
 	}
 
 	if entry.Msg != "" {
 		t.Fatalf(
-			"TestNilBuilder: expected msg to be empty, got '%s'",
+			"expected msg to be empty, got '%s'",
 			entry.Msg)
 	}
 
 	if entry.Counters.Error1 != 1 {
 		t.Fatalf(
-			"TestNilBuilder: expected Error1 to be 1, got %d",
+			"expected Error1 to be 1, got %d",
 			entry.Counters.Error1)
 	}
 
 	if entry.Counters.Error2 != 0 {
 		t.Fatalf(
-			"TestNilBuilder: expected Error2 to be 0, got %d",
+			"expected Error2 to be 0, got %d",
 			entry.Counters.Error2)
 	}
 
-	functionName := stacktraces.FunctionName()
 	name, _, err := firstFunction(entry.StackTrace)
 
 	if err != nil {
-		t.Fatalf("TestNilBuilder: error parsing stack trace: %s", err.Error())
+		t.Fatalf("error parsing stack trace: %s", err.Error())
 	}
 
+	functionName := stacktraces.FunctionName()
+
 	if name != functionName {
-		t.Fatalf("TestNilBuilder: expected stack trace not start with '%s', got '%s'", functionName, name)
+		t.Fatalf("expected stack trace not start with '%s', got '%s'", functionName, name)
 	}
 
 	if len(entry.Tags) != 1 {
-		t.Fatalf("TestNilBuilder: expected length of %#v to be 1", entry.Tags)
+		t.Fatalf("expected length of %#v to be 1", entry.Tags)
 	}
 
 	if !slices.Contains[[]string](entry.Tags, "test") {
-		t.Fatalf("TestNilBuilder: expected %#v to contain 'test'", entry.Tags)
+		t.Fatalf("expected %#v to contain 'test'", entry.Tags)
 	}
 }
 
@@ -282,14 +419,12 @@ func TestLazyEvaluation(t *testing.T) {
 	}
 
 	logger := New(writer, &options)
-	ctx := context.Background()
 
-	if logger.Enabled(ctx, TRACE) {
+	if logger.Enabled(TRACE) {
 		t.Fatalf("TestLazyEvaluation: expected TRACE to be disabled by default")
 	}
 
 	logger.Trace(
-		ctx,
 		func() string {
 			t.Fatalf("TestLazyEvaluation: msg builder should not be called")
 			return "error"
@@ -314,8 +449,54 @@ func TestTrace(t *testing.T) {
 
 	logger := New(writer, nil)
 	logger.SetVerbosity(TRACE)
-	ctx := context.Background()
 	logger.Trace(
+		func() string {
+			return "trace"
+		})
+
+	writer.Flush()
+	b := buffer.Bytes()
+
+	type logEntry struct {
+		Time      string   `json:"time"`
+		Verbosity string   `json:"verbosity"`
+		Msg       string   `json:"msg"`
+		Tags      []string `json:"tags,omitempty"`
+	}
+
+	entry := logEntry{}
+	err := json.Unmarshal(b, &entry)
+
+	if err != nil {
+		t.Fatalf("TestTrace: error unmarshaling log entry; %s", err.Error())
+	}
+
+	if entry.Verbosity != "TRACE" {
+		t.Fatalf(
+			"TestTrace: expected verbosity 'TRACE', got '%s'",
+			entry.Verbosity)
+	}
+
+	if entry.Msg != "trace" {
+		t.Fatalf(
+			"TestTrace: expected msg 'trace', got '%s'",
+			entry.Msg)
+	}
+
+	if len(entry.Tags) != 0 {
+		t.Fatalf("TestTrace: expected no tags, got %#v", entry.Tags)
+	}
+}
+
+func TestTraceContext(t *testing.T) {
+
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+
+	logger := New(writer, nil)
+	logger.SetVerbosity(TRACE)
+	ctx := context.Background()
+	logger.TraceContext(
 		ctx,
 		func() string {
 			return "trace"
@@ -361,8 +542,48 @@ func TestFine(t *testing.T) {
 	writer := bufio.NewWriter(&buffer)
 
 	logger := New(writer, nil)
-	ctx := context.Background()
 	logger.Fine(
+		func() string {
+			return "fine"
+		})
+
+	writer.Flush()
+	b := buffer.Bytes()
+
+	type logEntry struct {
+		Time      string `json:"time"`
+		Verbosity string `json:"verbosity"`
+		Msg       string `json:"msg"`
+	}
+
+	entry := logEntry{}
+	err := json.Unmarshal(b, &entry)
+
+	if err != nil {
+		t.Fatalf("TestFine: error unmarshaling log entry; %s", err.Error())
+	}
+
+	if entry.Verbosity != "FINE" {
+		t.Fatalf(
+			"TestFine: expected verbosity 'FINE', got '%s'",
+			entry.Verbosity)
+	}
+
+	if entry.Msg != "fine" {
+		t.Fatalf(
+			"TestFine: expected msg 'fine', got '%s'",
+			entry.Msg)
+	}
+}
+
+func TestFineContext(t *testing.T) {
+
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+
+	logger := New(writer, nil)
+	ctx := context.Background()
+	logger.FineContext(
 		ctx,
 		func() string {
 			return "fine"
@@ -403,8 +624,48 @@ func TestOptional(t *testing.T) {
 	writer := bufio.NewWriter(&buffer)
 
 	logger := New(writer, nil)
-	ctx := context.Background()
 	logger.Optional(
+		func() string {
+			return "optional"
+		})
+
+	writer.Flush()
+	b := buffer.Bytes()
+
+	type logEntry struct {
+		Time      string `json:"time"`
+		Verbosity string `json:"verbosity"`
+		Msg       string `json:"msg"`
+	}
+
+	entry := logEntry{}
+	err := json.Unmarshal(b, &entry)
+
+	if err != nil {
+		t.Fatalf("TestOptional: error unmarshaling log entry; %s", err.Error())
+	}
+
+	if entry.Verbosity != "OPTIONAL" {
+		t.Fatalf(
+			"TestOptional: expected verbosity 'OPTIONAL', got '%s'",
+			entry.Verbosity)
+	}
+
+	if entry.Msg != "optional" {
+		t.Fatalf(
+			"TestOptional: expected msg 'optional', got '%s'",
+			entry.Msg)
+	}
+}
+
+func TestOptionalContext(t *testing.T) {
+
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+
+	logger := New(writer, nil)
+	ctx := context.Background()
+	logger.OptionalContext(
 		ctx,
 		func() string {
 			return "optional"
@@ -449,8 +710,7 @@ func TestIntTag(t *testing.T) {
 	}
 
 	logger := New(writer, &options)
-	ctx := context.Background()
-	logger.Always(ctx, nil, TAGS, 1)
+	logger.Always(nil, TAGS, 1)
 	writer.Flush()
 	b := buffer.Bytes()
 
@@ -491,8 +751,7 @@ func TestStringTag(t *testing.T) {
 	}
 
 	logger := New(writer, &options)
-	ctx := context.Background()
-	logger.Always(ctx, nil, TAGS, "foo")
+	logger.Always(nil, TAGS, "foo")
 	writer.Flush()
 	b := buffer.Bytes()
 
@@ -619,5 +878,240 @@ func TestVerbosity(t *testing.T) {
 
 	if actual != TRACE {
 		t.Fatalf("expected verbosity to be %d, got %d", TRACE, actual)
+	}
+}
+
+func TestDefer(t *testing.T) {
+
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+	logger := New(writer, nil)
+	finallyRan := false
+	expectedName := ""
+
+	panicWithDefer := func() {
+		expectedName = stacktraces.FunctionName()
+		defer logger.Defer(
+			func() { finallyRan = true },
+			func(recovered any) (string, any) { return fmt.Sprint(recovered), nil },
+			STACKTRACE, expectedName)
+		panic("panic")
+	}
+
+	panicWithDefer()
+	writer.Flush()
+	b := buffer.Bytes()
+
+	if !finallyRan {
+		t.Fatalf("expected 'finally' to have been execcuted")
+	}
+
+	type Entry struct {
+		Time       string `json:"time"`
+		Verbosity  string `json:"verbosity"`
+		Msg        string `json:"msg"`
+		StackTrace string `json:"stacktrace"`
+	}
+
+	entry := Entry{}
+	err := json.Unmarshal(b, &entry)
+
+	if err != nil {
+		t.Fatalf("error unmarshaling log entry: %s", err.Error())
+	}
+
+	if entry.Msg != "panic" {
+		t.Fatalf("expected msg to be 'panic', got '%s'", entry.Msg)
+	}
+
+	name, _, err := firstFunction(entry.StackTrace)
+
+	if err != nil {
+		t.Fatalf("error parsing stack trace: %s", err.Error())
+	}
+
+	if name != expectedName {
+		t.Fatalf("expected stack trace to start with '%s', got '%s'", expectedName, name)
+	}
+}
+
+func TestDeferContext(t *testing.T) {
+
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+	logger := New(writer, nil)
+	finallyRan := false
+	expectedName := ""
+
+	panicWithDefer := func() {
+		expectedName = stacktraces.FunctionName()
+		defer logger.DeferContext(
+			func() { finallyRan = true },
+			context.Background(),
+			func(recovered any) (string, any) { return fmt.Sprint(recovered), nil },
+			STACKTRACE, expectedName)
+		panic("panic")
+	}
+
+	panicWithDefer()
+	writer.Flush()
+	b := buffer.Bytes()
+
+	if !finallyRan {
+		t.Fatalf("expected 'finally' to have been execcuted")
+	}
+
+	type Entry struct {
+		Time       string `json:"time"`
+		Verbosity  string `json:"verbosity"`
+		Msg        string `json:"msg"`
+		StackTrace string `json:"stacktrace"`
+	}
+
+	entry := Entry{}
+	err := json.Unmarshal(b, &entry)
+
+	if err != nil {
+		t.Fatalf("error unmarshaling log entry: %s", err.Error())
+	}
+
+	if entry.Msg != "panic" {
+		t.Fatalf("expected msg to be 'panic', got '%s'", entry.Msg)
+	}
+
+	name, _, err := firstFunction(entry.StackTrace)
+
+	if err != nil {
+		t.Fatalf("error parsing stack trace: %s", err.Error())
+	}
+
+	if name != expectedName {
+		t.Fatalf("expected stack trace to start with '%s', got '%s'", expectedName, name)
+	}
+}
+
+func TestOddAttributes(t *testing.T) {
+
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+	options := LoggerOptions{
+		BaseAttributes: []any{"foo", "bar", "stacktrace", nil},
+		BaseTags:       []string{"test"},
+	}
+	logger := New(writer, &options)
+
+	logger.Always(nil, "baz", "waka", "hoo")
+
+	writer.Flush()
+	b := buffer.Bytes()
+
+	type Entry struct {
+		Time       string   `json:"time"`
+		Verbosity  string   `json:"verbosity"`
+		Msg        string   `json:"msg"`
+		Foo        string   `json:"foo"`
+		Baz        string   `json:"baz"`
+		StackTrace string   `json:"stacktrace"`
+		Tags       []string `json:"tags"`
+	}
+
+	entry := Entry{}
+	err := json.Unmarshal(b, &entry)
+
+	if err != nil {
+		t.Fatalf("error parsing log entry: %s", err.Error())
+	}
+
+	if entry.Foo != "bar" {
+		t.Fatalf("expected value of 'foo' to be 'bar', got '%s'", entry.Foo)
+	}
+
+	if entry.Baz != "waka" {
+		t.Fatalf("expected value of 'baz' to be 'waka', got '%s'", entry.Baz)
+	}
+
+	expected := stacktraces.FunctionName()
+	actual, _, err := firstFunction(entry.StackTrace)
+
+	if err != nil {
+		t.Fatalf("error parsing stacktrace: %s", err.Error())
+	}
+
+	if actual != expected {
+		t.Fatalf("expected function name to be '%s', got '%s'", expected, actual)
+	}
+}
+
+func TestPanicInMessage(t *testing.T) {
+
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+	logger := New(writer, nil)
+
+	logger.Always(
+		func() string {
+			panic("deliberate")
+		})
+
+	writer.Flush()
+	b := buffer.Bytes()
+
+	if len(b) > 0 {
+		t.Fatalf("expected nothing to be logged, got '%s'", string(b))
+	}
+}
+
+func TestPanicInFinally(t *testing.T) {
+
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+	logger := New(writer, nil)
+
+	panicInFinally := func() {
+		defer logger.Defer(func() { panic("deliberate") }, nil)
+	}
+
+	panicInFinally()
+
+	writer.Flush()
+	b := buffer.Bytes()
+
+	if len(b) > 0 {
+		t.Fatalf("expected nothing to be logged, got '%s'", string(b))
+	}
+}
+
+func TestBadKey(t *testing.T) {
+
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+	logger := New(writer, nil)
+
+	logger.Always(nil, "good1", 1, 10, "bad", "good2", 2)
+
+	writer.Flush()
+	b := buffer.Bytes()
+
+	type Entry struct {
+		Time      string `json:"time"`
+		Verbosity string `json:"verbosity"`
+		Msg       string `json:"msg"`
+		Good1     int    `json:"good1"`
+		Good2     int    `json:"good2"`
+	}
+
+	entry := Entry{}
+	err := json.Unmarshal(b, &entry)
+
+	if err != nil {
+		t.Fatalf("error parsing log entry: %s", err.Error())
+	}
+
+	if entry.Good1 != 1 {
+		t.Fatalf("expected value of 'good1' to be 1, got %d", entry.Good1)
+	}
+
+	if entry.Good2 != 2 {
+		t.Fatalf("expected value of 'good2' to be 2, got %d", entry.Good2)
 	}
 }
