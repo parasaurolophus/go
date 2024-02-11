@@ -10,6 +10,251 @@ cd logging
 go doc -all
 ```
 
+```
+package logging // import "parasaurolophus/go/logging"
+
+
+CONSTANTS
+
+const (
+
+	// Only emit a log entry when extremely verbose output is specified.
+	//
+	// Intended for use in development environments when ultra-fine-grained
+	// logging is needed during focused testing and debugging sessions.
+	TRACE = Verbosity(slog.LevelDebug)
+
+	// Only emit a log entry when unusually verbose output is specified.
+	//
+	// Intended for use in development and testing environments for everyday
+	// acceptance testing and troubleshooting.
+	FINE = Verbosity(slog.LevelInfo)
+
+	// Only emit a log entry when conventionally verbose output is specified.
+	//
+	// Intended for use in testing and staging environments, e.g. during
+	// regression tests before release to production.
+	OPTIONAL = Verbosity(slog.LevelWarn)
+
+	// Always emit a log entry.
+	//
+	// Intended for production environments to drive monitoring, alerting and
+	// analytics.
+	ALWAYS = Verbosity(slog.LevelError)
+)
+    Mapping of Verbosity to slog.Level values with guidelines for intended use.
+
+const (
+
+	// Values of "stacktrace" attributes will be replaced with one-line stack
+	// traces for the function that called the given logging method.
+	//
+	// See stacktraces.ShortStackTrace(any)
+	STACKTRACE = "stacktrace"
+
+	// Value will be merged with the currently configured
+	// LoggerOptions.BaseTags.
+	TAGS = "tags"
+)
+    Specially handled attributes.
+
+
+TYPES
+
+type Finally func()
+    Type of function passed to Logger.Defer()
+
+type Logger struct {
+	// Has unexported fields.
+}
+    Wrapper for an instance of slog.Logger.
+
+func New(writer io.Writer, options *LoggerOptions) *Logger
+    Returns a newly created, wrapped instance of slog.Logger.
+
+    Log entries written using the returned Logger instance will have
+    "verbosity" attributes instead of "level" attributes and the values of
+    their "stacktrace" attributes, if present, will be replaced as if by an
+    invocation of ShortStackTrace(skipFrames) where skipFrames is the value
+    of the "stacktrace" attribute passed to a logging method. The final set of
+    attributes for each log entry will be the result of combining the value of
+    LoggerOptions.BaseAttributes and LoggerOptions.BaseTags with the attributes
+    passed to the given logging method.
+
+    For example:
+
+        type Counters struct {
+            Error1 int `json:"error1"`
+            Error2 int `json:"error2"`
+        }
+
+        counters := Counters{}
+
+        options := logging.LoggerOptions{
+            BaseAttributes: []any{"counters", &counters},
+            BaseTags:       []string{"foo", "bar"},
+        }
+
+        logger := logging.New(os.Stdout, &options)
+        n := 42
+        counters.Error1 += 1
+
+        logger.Optional(
+            func() string { return fmt.Sprintf("n = %d", n) },
+            logging.STACKTRACE, nil,
+            logging.TAGS, []string{"hoo"},
+            "baz", "waka")
+
+    produces a log entry like:
+
+        {"time":"2024-02-11T06:16:41.852302853-06:00","verbosity":"OPTIONAL","msg":"n = 42","counters":{"error1":1,"error2":0},"baz":"waka","stacktrace":"5:main.main [/source/go/scratch/scratch.go:29] < 6:runtime.main [/usr/local/go/src/runtime/proc.go:267] < 7:runtime.goexit [/usr/local/go/src/runtime/asm_arm64.s:1197]","tags":["foo","bar","hoo"]}
+
+    Note that if LoggerOptions.ReplaceAttr is not nil, it will be called
+    as described by the documentation for slog.HandlerOptions.ReplaceAttr
+    indirectly through a custom replacer function that replaces "level" with
+    "verbosity" as just described.
+
+    Note also that the values for attributes in LoggerOptions.BaseAttributes may
+    be passed by value or reference. Passing by reference allows for cases where
+    each log entry should include the current value for that attribute rather
+    than a copy of the value at the time the Logger was created.
+
+func (l *Logger) Always(message MessageBuilder, attributes ...any)
+    Log at ALWAYS verbosity.
+
+func (l *Logger) AlwaysContext(ctx context.Context, message MessageBuilder, attributes ...any)
+    Log at ALWAYS verbosity.
+
+func (l *Logger) BaseAttributes() []any
+    Return the current base attributes.
+
+func (l *Logger) BaseTags() []string
+    Return the current base tags.
+
+func (l *Logger) Defer(finally Finally, recoverHandler RecoverHandler, attributes ...any)
+    See documentation for Logger.DeferContext().
+
+func (l *Logger) DeferContext(finally Finally, ctx context.Context, recoverHandler RecoverHandler, attributes ...any)
+    For use with defer to log if a panic occurs.
+
+    If recover() returns non-nil, its value will be passed to handler.
+
+    Handler's first return value will be used as the msg string in writing a log
+    entry using l.Always().
+
+    If handler's second return value is not nil it will be passed to a
+    subsequent invocation of panic().
+
+    For example, if the following is invoked in a goroutine that was passed a
+    channel named ch:
+
+        name := stacktraces.FunctionName()
+        defer logger.DeferContext(
+
+            // clean-up function is always invoked
+            func() { close(ch) },
+
+            // remaining parameters are passed to logger.Always() when
+            // recover() returns non-nil
+
+            ctx,
+            func(r any) (string, any) {
+                // second value will be used to resume panicing if non-nil
+                // (typically this would be r to continue the now tidied
+                // and logged panic in main.main or nil in a goroutine
+                // so as to allow other goroutines to complete)
+                return fmt.Sprintf("%s recovered from %v", name, r), nil
+            },
+            logging.TAGS, []string{"PANIC", "ERROR", "SEVERE"},
+            logging.STACKTRACE, name,
+        )
+
+    the goroutine will close ch on exit and write a log entry whose msg is the
+    string representation of the value returned by recover() when a panic occurs
+    and then allow other goroutines to continue normally. If the second return
+    value from the handler is not nil, that value will be passed to panic()
+    after the clean up and logging functions are invoked. [See the documentation
+    for panic() / recover() for more information.]
+
+func (l *Logger) Enabled(verbosity Verbosity) bool
+    Return true or false depending on whether or not the given verbosity is
+    currently enabled for the given logger.
+
+func (l *Logger) EnabledContext(ctx context.Context, verbosity Verbosity) bool
+    Return true or false depending on whether or not the given verbosity is
+    currently enabled for the given logger.
+
+func (l *Logger) Fine(message MessageBuilder, attributes ...any)
+    Log at FINE verbosity.
+
+func (l *Logger) FineContext(ctx context.Context, message MessageBuilder, attributes ...any)
+    Log at FINE verbosity.
+
+func (l *Logger) Optional(message MessageBuilder, attributes ...any)
+    Log at OPTIONAL verbosity.
+
+func (l *Logger) OptionalContext(ctx context.Context, message MessageBuilder, attributes ...any)
+    Log at OPTIONAL verbosity.
+
+func (l *Logger) SetBaseAttributes(attributes ...any)
+    Update the base attributes.
+
+func (l *Logger) SetBaseTags(tags ...string)
+    Update the base tags.
+
+func (l *Logger) SetContext(ctx context.Context)
+    Deprecated hack for backwards compatibility.
+
+func (l *Logger) SetVerbosity(verbosity Verbosity)
+    Update the verbosity
+
+func (l *Logger) Trace(message MessageBuilder, attributes ...any)
+    Log at TRACE verbosity.
+
+func (l *Logger) TraceContext(ctx context.Context, message MessageBuilder, attributes ...any)
+    Log at TRACE verbosity.
+
+func (l *Logger) Verbosity() Verbosity
+    Return the current verbosity
+
+type LoggerOptions struct {
+
+	// Pass through to HandlerOptions for the wrapped slog.Logger.
+	AddSource bool
+
+	// Initial set of attributes that will be added to every log entry.
+	BaseAttributes []any
+
+	// Initial set of tags that will be added to every log entry.
+	BaseTags []string
+
+	// Shared slog.LevelVar, if desired; a Leveler will be created if this
+	// is nil.
+	Level *slog.LevelVar
+
+	// If not nil, an attribute replacer function that will be called in
+	// addition to replacing "level" attributes with "verbosiy" and other
+	// special attribute handling.
+	ReplaceAttr func([]string, slog.Attr) slog.Attr
+}
+    Configuration parameters for an instance of Logger.
+
+type MessageBuilder func() string
+    Type of function passed to logging methods for lazy evaluation of message
+    formatting.
+
+    The returned string becomes the value of the log entry's msg attribute.
+
+    Such a function is invoked only if a given verbosity is enabled for a given
+    logger.
+
+type RecoverHandler func(recovered any) (string, any)
+    Type of function passed to Logger.Defer().
+
+type Verbosity int
+    Verbosity-based nomenclature used in place of slog.Level.
+```
+
 ## Overview
 
 The design of Go's standard `log/slog` package leaves much to be desired. This

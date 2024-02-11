@@ -64,19 +64,31 @@ type (
 	}
 )
 
-// Mapping of Verbosity to slog.Level values.
+// Mapping of Verbosity to slog.Level values with guidelines for intended use.
 const (
 
-	// Only emit a log entry when the most verbose output is specified.
+	// Only emit a log entry when extremely verbose output is specified.
+	//
+	// Intended for use in development environments when ultra-fine-grained
+	// logging is needed during focused testing and debugging sessions.
 	TRACE = Verbosity(slog.LevelDebug)
 
 	// Only emit a log entry when unusually verbose output is specified.
+	//
+	// Intended for use in development and testing environments for everyday
+	// acceptance testing and troubleshooting.
 	FINE = Verbosity(slog.LevelInfo)
 
 	// Only emit a log entry when conventionally verbose output is specified.
+	//
+	// Intended for use in testing and staging environments, e.g. during
+	// regression tests before release to production.
 	OPTIONAL = Verbosity(slog.LevelWarn)
 
 	// Always emit a log entry.
+	//
+	// Intended for production environments to drive monitoring, alerting and
+	// analytics.
 	ALWAYS = Verbosity(slog.LevelError)
 )
 
@@ -89,7 +101,8 @@ const (
 	// See stacktraces.ShortStackTrace(any)
 	STACKTRACE = "stacktrace"
 
-	// Value will be merged with the currently configured base tags.
+	// Value will be merged with the currently configured
+	// LoggerOptions.BaseTags.
 	TAGS = "tags"
 )
 
