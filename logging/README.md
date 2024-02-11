@@ -261,7 +261,7 @@ The design of Go's standard `log/slog` package leaves much to be desired. This
 is a very thin wrapper that helps address some (but far from all) of its
 shortcomings.
 
-- [Streamline syntax](#streamlined-syntax) for logger construction and usage
+- [Streamlined syntax](#streamlined-syntax) for logger construction and usage
 
   - Hard-code use of `slog.JSONHandler`
 
@@ -351,10 +351,10 @@ Rather than:
 
 ```go
 // ...instead of this
-slogger.DebugContext("...")
-slogger.InfoContext("...")
-slogger.WarnContext("...")
-slogger.ErrorContext("...")
+slogger.Debug("...")
+slogger.Info("...")
+slogger.Warn("...")
+slogger.Error("...")
 ```
 
 ## Attributes with Special Handling
