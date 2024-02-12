@@ -25,10 +25,12 @@ type (
 	// given logger.
 	MessageBuilder func() string
 
-	// Type of function passed to Logger.Defer()
+	// Type of function passed as first argument to Logger.Defer() and
+	// Logger.DeferContext().
 	Finally func()
 
-	// Type of function passed to Logger.Defer().
+	// Type of function passed to Logger.Defer() and Logger.DeferContext() to
+	// allow for including the value returned by recover() in the log entry.
 	RecoverHandler func(recovered any) (string, any)
 
 	// Configuration parameters for an instance of Logger.
@@ -64,31 +66,37 @@ type (
 	}
 )
 
-// Mapping of Verbosity to slog.Level values with guidelines for intended use.
+// Mapping of Verbosity to slog.Level values.
+//
+// Generally, assume that only ALWAYS will be enabled in production environments
+// and that TRACE will never be enabled outside of development environments.
 const (
 
 	// Only emit a log entry when extremely verbose output is specified.
 	//
-	// Intended for use in development environments when ultra-fine-grained
-	// logging is needed during focused testing and debugging sessions.
+	// Intended for use in development environments for focused debugging
+	// sessions. This should never be enabled outside of development
+	// environments. Any logging that might potentially reveal PII, SPI or
+	// critically sensitive security information must only be written at TRACE
+	// level in environments where only synthetic or redacted data is in use.
 	TRACE = Verbosity(slog.LevelDebug)
 
 	// Only emit a log entry when unusually verbose output is specified.
 	//
-	// Intended for use in development and testing environments for everyday
-	// acceptance testing and troubleshooting.
+	// Intended for use in development environments for everyday testing and
+	// troubleshooting prior to a release candidate being deployed.
 	FINE = Verbosity(slog.LevelInfo)
 
-	// Only emit a log entry when conventionally verbose output is specified.
+	// Only emit a log entry when moderately verbose output is specified.
 	//
 	// Intended for use in testing and staging environments, e.g. during
-	// regression tests before release to production.
+	// acceptance and regression tests before release to production.
 	OPTIONAL = Verbosity(slog.LevelWarn)
 
 	// Always emit a log entry.
 	//
 	// Intended for production environments to drive monitoring, alerting and
-	// analytics.
+	// reporting.
 	ALWAYS = Verbosity(slog.LevelError)
 )
 
@@ -97,8 +105,6 @@ const (
 
 	// Values of "stacktrace" attributes will be replaced with one-line stack
 	// traces for the function that called the given logging method.
-	//
-	// See stacktraces.ShortStackTrace(any)
 	STACKTRACE = "stacktrace"
 
 	// Value will be merged with the currently configured
@@ -107,7 +113,7 @@ const (
 )
 
 var (
-	// Default context for logging.
+	// Default context for logging from command-line applications and the like.
 	defaultContext = context.Background()
 )
 
@@ -192,7 +198,7 @@ func (l *Logger) Trace(message MessageBuilder, attributes ...any) {
 	l.log(defaultContext, TRACE, message, attributes...)
 }
 
-// Log at TRACE verbosity.
+// Log at TRACE verbosity using the supplied context.
 func (l *Logger) TraceContext(ctx context.Context, message MessageBuilder, attributes ...any) {
 	l.log(ctx, TRACE, message, attributes...)
 }
@@ -202,7 +208,7 @@ func (l *Logger) Fine(message MessageBuilder, attributes ...any) {
 	l.log(defaultContext, FINE, message, attributes...)
 }
 
-// Log at FINE verbosity.
+// Log at FINE verbosity using the supplied context.
 func (l *Logger) FineContext(ctx context.Context, message MessageBuilder, attributes ...any) {
 	l.log(ctx, FINE, message, attributes...)
 }
@@ -212,7 +218,7 @@ func (l *Logger) Optional(message MessageBuilder, attributes ...any) {
 	l.log(defaultContext, OPTIONAL, message, attributes...)
 }
 
-// Log at OPTIONAL verbosity.
+// Log at OPTIONAL verbosity using the supplied context.
 func (l *Logger) OptionalContext(ctx context.Context, message MessageBuilder, attributes ...any) {
 	l.log(ctx, OPTIONAL, message, attributes...)
 }
@@ -222,7 +228,7 @@ func (l *Logger) Always(message MessageBuilder, attributes ...any) {
 	l.log(defaultContext, ALWAYS, message, attributes...)
 }
 
-// Log at ALWAYS verbosity.
+// Log at ALWAYS verbosity using the supplied context.
 func (l *Logger) AlwaysContext(ctx context.Context, message MessageBuilder, attributes ...any) {
 	l.log(ctx, ALWAYS, message, attributes...)
 }
