@@ -158,7 +158,7 @@ func TestStackTraceNameNotFound(t *testing.T) {
 
 func TestStackTraceDepth(t *testing.T) {
 
-	trace := New("test", 1025)
+	trace := New("test", 100)
 
 	if trace.LongTrace() != "" {
 		t.Fatalf(

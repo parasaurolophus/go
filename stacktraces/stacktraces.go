@@ -10,98 +10,99 @@ import (
 )
 
 type (
+
 	// Error objects that contain the current call stack at the time they were
 	// created.
 	//
 	// Use stacktraces.New(msg string, skipFrames any) in place of
 	// errors.new(msg string).
-	//
-	// See LongStackTrace(skipFrames any) and ShortStackTrace(skipFrames any).
 	StackTrace struct {
 
 		// String returned by StackTrace.Error().
 		msg string
 
-		// String returned by StackTrace.LongTrace().
+		// Multi-line stack trace returned by StackTrace.LongTrace().
 		longTrace string
 
-		// String returned by StackTrace.ShortTrace().
+		// One-line stack trace returned by StackTrace.ShortTrace().
 		shortTrace string
 	}
+)
+
+const (
+
+	// Capacity of address buffer passed to runtime.Callers().
+	maxDepth = 1024
 )
 
 // Return the name of the function that called this one, i.e. the currently
 // executing function from that function's point of view.
 func FunctionName() string {
 
-	// the number of frames to skip is empirically derived and may change as a
-	// result of any refactoring of this library
+	// The number of frames to skip is empirically derived and may change as a
+	// result of any refactoring of this function or Go's standard runtime
+	// library.
+	//
+	// The current value assumes that the first frame is runtime.Callers(), the
+	// second frame is this function.
+	const skip = 2
 
-	// current assumes first frame is runtime.Callers(), second frame is this
-	// function
-
-	pc := make([]uintptr, 1024)
-	n := runtime.Callers(2, pc)
+	pc := make([]uintptr, maxDepth)
+	n := runtime.Callers(skip, pc)
 	pc = pc[:n]
 	frames := runtime.CallersFrames(pc)
 	frame, _ := frames.Next()
 	return frame.Function
 }
 
-// Return a newly created object that implements the StackTrace interface.
+// Convenience function for creating a multi-line trace of the current call
+// stack.
+//
+// See New() for a description of the skipFrames parameter.
+func LongStackTrace(skipFrames any) string {
+
+	trace, _ := formatStackTrace(skipFrames, longFrameFormatter(), nil)
+	return trace
+}
+
+// Convenience function for creating a one-line trace of the current call stack.
+//
+// See New() for a description of the skipFrames parameter.
+func ShortStackTrace(skipFrames any) string {
+
+	_, trace := formatStackTrace(skipFrames, nil, shortFrameFormatter())
+	return trace
+}
+
+// Return a newly created StackTrace object that captures the current call
+// stack.
 //
 // The given msg will be returned by StackTrace.Error().
 //
 // skipFrames may be an int or string; when passed a value of any other type,
-// the value will be ignored and the behavior will be as if 0 were passed.
+// the actual value will be ignored and the behavior will be as described below.
 //
-// The traces returned by stackTrace.LongTrace() and stackTrace.ShortTrace()
+// The strings returned by stackTrace.LongTrace() and stackTrace.ShortTrace()
 // will include all of the call stack frames at the time this constructor is
 // called, excluding ones from the top of the stack as follows:
 //
 //   - If skipFrames is a non-negative int the specified number of frames are
 //     skipped.
 //
-//   - If skipFrames is a string all frames before the frame for the function
-//     with the given name are skipped.
+//   - If skipFrames is a string all frames before the function with the
+//     given name are skipped.
 //
 //   - If skipFrames is any other value, all frames up to and including this
 //     function's frame are skipped.
 //
-// The empty string is returned if the stack depth is exceeded when passing a
-// positive int or no matching frame is found when passing a string.
+// The empty string is returned for both traces if the stack depth is exceeded
+// when passing a positive int or no matching frame is found when passing a
+// string.
 func New(msg string, skipFrames any) StackTrace {
 
 	longFormatter := longFrameFormatter()
 	shortFormatter := shortFrameFormatter()
-	long := ""
-	short := ""
-
-	switch v := skipFrames.(type) {
-
-	case int:
-
-		if v < 0 {
-
-			// the number of frames to skip is empirically derived and may
-			// change as a result of any refactoring of this library's code
-			long, short = formatStackTrace(3, longFormatter, shortFormatter)
-
-		} else {
-
-			long, short = formatStackTrace(v, longFormatter, shortFormatter)
-		}
-
-	case string:
-
-		long, short = formatStackTrace(v, longFormatter, shortFormatter)
-
-	default:
-
-		// the number of frames to skip is empirically derived and may
-		// change as a result of any refactoring of this library's code
-		long, short = formatStackTrace(3, longFormatter, shortFormatter)
-	}
+	long, short := formatStackTrace(skipFrames, longFormatter, shortFormatter)
 
 	return StackTrace{
 		msg:        msg,
@@ -126,18 +127,6 @@ func (t StackTrace) LongTrace() string {
 func (t StackTrace) ShortTrace() string {
 
 	return t.shortTrace
-}
-
-func LongStackTrace(skipFrames any) string {
-
-	trace, _ := formatStackTrace(skipFrames, longFrameFormatter(), nil)
-	return trace
-}
-
-func ShortStackTrace(skipFrames any) string {
-
-	_, trace := formatStackTrace(skipFrames, nil, shortFrameFormatter())
-	return trace
 }
 
 type (
@@ -199,68 +188,97 @@ func shortFrameFormatter() stackFrameFormatter {
 // Helper used by New(string, any), LongStackTrace(any) and
 // ShortStackTrace(any).
 //
-// Returns long and short string representations of the current call stack.
+// Returns multi-line and one-line string representations of the current call
+// stack.
 func formatStackTrace(skipFrames any, longFormatter stackFrameFormatter, shortFormatter stackFrameFormatter) (string, string) {
 
+	// The default number of frames to skip when skipFrames is neither a string
+	// nor a positive int.
+	//
+	// This could change as a result of refactoring this or Go's standard
+	// runtime libraries. Current value of 3 is based on:
+	//
+	// 1. The function where the trace should start calls LongStackTrace(),
+	//    ShortStackTrace() or New().
+	//
+	// 2. LongstackTrace(), ShortStackTrace() and New() call formatStackTrace()
+	//
+	// 3. formatStackTrace() calls runtime.Callers() and that is the first frame
+	//    on the stack.
+	const defaultSkip = 3
+
+	// in-memory writers in which the stack trace strings will be built
 	longBuffer := bytes.Buffer{}
 	longWriter := bufio.NewWriter(&longBuffer)
-
 	shortBuffer := bytes.Buffer{}
 	shortWriter := bufio.NewWriter(&shortBuffer)
 
+	// the number that will be passed to runtime.Callers()
 	skip := 0
+
+	// default frame test unconditionally returns true on the assumption that
+	// skip will be a non-negative int
 	frameTest := func(*runtime.Frame) bool { return true }
 
+	// adjust skip and frameTest according to the supplied value of skipFrames
 	switch v := skipFrames.(type) {
 
 	case int:
 		if v < 0 {
-			// the number of frames to skip is empirically derived and may
-			// change any time the code in this library is refactored
-			skip = 3
+			// skip past this function's caller's caller when skipFrames is
+			// negative
+			skip = defaultSkip
 		} else {
+			// skip the specified number of frames when skipFrames is
+			// non-negative
 			skip = v
 		}
 
 	case string:
-		frameTest = startWhenSeen(v)
+		// use a frameTest that skips all frames until a given function is seen
+		frameTest = skipUntil(v)
 
 	default:
-		// the number of frames to skip is empirically derived and may
-		// change any time the code in this library is refactored
-		skip = 3
+		// skip past this function's caller's caller when skipFrames is any
+		// other value
+		skip = defaultSkip
 	}
 
-	pc := make([]uintptr, 1024)
+	// capture the current call stack's addresses using (what is to be hoped) a
+	// sufficient size of address buffer
+	pc := make([]uintptr, maxDepth)
 	n := runtime.Callers(skip, pc)
 
-	if n < 1 {
-		return "", ""
-	}
+	// when stack depth was not exceeded...
+	if n > 0 {
 
-	pc = pc[:n]
-	frames := runtime.CallersFrames(pc)
-	frameNumber := skip
+		// ...iterate over the captured call stack's frames, applying the
+		// formatters to each frame for which frameTest returns true
 
-	for {
+		pc = pc[:n]
+		frames := runtime.CallersFrames(pc)
+		frameNumber := skip
 
-		frame, more := frames.Next()
+		for {
 
-		if frameTest(&frame) {
+			frame, more := frames.Next()
 
-			if longFormatter != nil {
-				longFormatter(longWriter, frameNumber, &frame)
+			if frameTest(&frame) {
+
+				if longFormatter != nil {
+					longFormatter(longWriter, frameNumber, &frame)
+				}
+
+				if shortFormatter != nil {
+					shortFormatter(shortWriter, frameNumber, &frame)
+				}
 			}
 
-			if shortFormatter != nil {
-				shortFormatter(shortWriter, frameNumber, &frame)
+			frameNumber += 1
+
+			if !more {
+				break
 			}
-		}
-
-		frameNumber += 1
-
-		if !more {
-			break
 		}
 	}
 
@@ -273,7 +291,7 @@ func formatStackTrace(skipFrames any, longFormatter stackFrameFormatter, shortFo
 // function name and all that follow it.
 //
 // This is the frame test used by formatStackTrace() when skipFrames is a string
-func startWhenSeen(startWhen string) stackFrameTest {
+func skipUntil(startWhen string) stackFrameTest {
 
 	seen := false
 

@@ -21,7 +21,17 @@ func FunctionName() string
     executing function from that function's point of view.
 
 func LongStackTrace(skipFrames any) string
+    Convenience function for creating a multi-line trace of the current call
+    stack.
+
+    See New() for a description of the skipFrames parameter.
+
 func ShortStackTrace(skipFrames any) string
+    Convenience function for creating a one-line trace of the current call
+    stack.
+
+    See New() for a description of the skipFrames parameter.
+
 
 TYPES
 
@@ -34,31 +44,32 @@ type StackTrace struct {
     Use stacktraces.New(msg string, skipFrames any) in place of errors.new(msg
     string).
 
-    See LongStackTrace(skipFrames any) and ShortStackTrace(skipFrames any).
-
 func New(msg string, skipFrames any) StackTrace
-    Return a newly created object that implements the StackTrace interface.
+    Return a newly created StackTrace object that captures the current call
+    stack.
 
     The given msg will be returned by StackTrace.Error().
 
     skipFrames may be an int or string; when passed a value of any other type,
-    the value will be ignored and the behavior will be as if 0 were passed.
+    the actual value will be ignored and the behavior will be as described
+    below.
 
-    The traces returned by stackTrace.LongTrace() and stackTrace.ShortTrace()
+    The strings returned by stackTrace.LongTrace() and stackTrace.ShortTrace()
     will include all of the call stack frames at the time this constructor is
     called, excluding ones from the top of the stack as follows:
 
       - If skipFrames is a non-negative int the specified number of frames are
         skipped.
 
-      - If skipFrames is a string all frames before the frame for the function
-        with the given name are skipped.
+      - If skipFrames is a string all frames before the function with the given
+        name are skipped.
 
       - If skipFrames is any other value, all frames up to and including this
         function's frame are skipped.
 
-    The empty string is returned if the stack depth is exceeded when passing a
-    positive int or no matching frame is found when passing a string.
+    The empty string is returned for both traces if the stack depth is exceeded
+    when passing a positive int or no matching frame is found when passing a
+    string.
 
 func (t StackTrace) Error() string
     Implement error interface.
@@ -103,11 +114,11 @@ stackTrace.ShortTrace(): 3:main.main.func1 [/source/go/scratch/scratch.go:15] < 
 stackTrace.LongTrace():
 3:main.main.func1
 /source/go/scratch/scratch.go:15
-0x8e47b
+0x8e38b
 ---
 4:main.main
 /source/go/scratch/scratch.go:16
-0x8e460
+0x8e370
 ---
 5:runtime.main
 /usr/local/go/src/runtime/proc.go:267
@@ -117,24 +128,24 @@ stackTrace.LongTrace():
 /usr/local/go/src/runtime/asm_arm64.s:1197
 0x6dc73
 
-stacktraces.ShortStackTrace(0): 0:runtime.Callers [/usr/local/go/src/runtime/extern.go:308] < 1:parasaurolophus/go/stacktraces.formatStackTrace [/source/go/stacktraces/stacktraces.go:235] < 2:parasaurolophus/go/stacktraces.ShortStackTrace [/source/go/stacktraces/stacktraces.go:139] < 3:main.main [/source/go/scratch/scratch.go:28] < 4:runtime.main [/usr/local/go/src/runtime/proc.go:267] < 5:runtime.goexit [/usr/local/go/src/runtime/asm_arm64.s:1197]
+stacktraces.ShortStackTrace(0): 0:runtime.Callers [/usr/local/go/src/runtime/extern.go:308] < 1:parasaurolophus/go/stacktraces.formatStackTrace [/source/go/stacktraces/stacktraces.go:250] < 2:parasaurolophus/go/stacktraces.ShortStackTrace [/source/go/stacktraces/stacktraces.go:73] < 3:main.main [/source/go/scratch/scratch.go:28] < 4:runtime.main [/usr/local/go/src/runtime/proc.go:267] < 5:runtime.goexit [/usr/local/go/src/runtime/asm_arm64.s:1197]
 
 stacktraces.LongStackTrace(0):
 0:runtime.Callers
 /usr/local/go/src/runtime/extern.go:308
-0x8e0a3
+0x8dfd3
 ---
 1:parasaurolophus/go/stacktraces.formatStackTrace
-/source/go/stacktraces/stacktraces.go:235
-0x8e050
+/source/go/stacktraces/stacktraces.go:250
+0x8df80
 ---
 2:parasaurolophus/go/stacktraces.LongStackTrace
-/source/go/stacktraces/stacktraces.go:133
-0x8daf7
+/source/go/stacktraces/stacktraces.go:64
+0x8d637
 ---
 3:main.main
 /source/go/scratch/scratch.go:29
-0x8e693
+0x8e5a3
 ---
 4:runtime.main
 /usr/local/go/src/runtime/proc.go:267
