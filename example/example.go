@@ -33,6 +33,9 @@ func main() {
 
 	defer logger.Defer(
 
+		// panics in main.main should cause abnormal termination
+		true,
+
 		// no clean-up required for main.main since sender() will close the
 		// channel passed to it
 		nil,
@@ -40,9 +43,8 @@ func main() {
 		// remaining parameters would be passed to logger.Always() if recover()
 		// returned non-nil in main.main
 
-		func(r any) (string, any) {
-			// return r as second value if a panic were to occur in main.main()
-			return fmt.Sprintf("%s recovered from '%v'", functionName, r), r
+		func(r any) string {
+			return fmt.Sprintf("%s recovered from '%v'", functionName, r)
 		},
 
 		// add conventional attributes for logging a panic
@@ -75,6 +77,9 @@ func sender(ch chan int) {
 
 	defer logger.Defer(
 
+		// log but otherwise ignore panics in this goroutine
+		false,
+
 		// clean-up function is always called when this function exits
 		func() {
 			logger.Trace(func() string { return fmt.Sprintf("%s closing channel", functionName) })
@@ -84,10 +89,10 @@ func sender(ch chan int) {
 		// remaining arguments are passed to logger.AlwaysContext() when
 		// recover() returns non-nil
 
-		func(recovered any) (string, any) {
+		func(recovered any) string {
 			// return nil as second value when panicing in a goroutine so that
 			// others can complete normally
-			return fmt.Sprintf("%s recovered from '%v'", functionName, recovered), nil
+			return fmt.Sprintf("%s recovered from '%v'", functionName, recovered)
 		},
 
 		// include conventional attributes for logging panics

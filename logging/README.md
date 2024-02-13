@@ -53,6 +53,10 @@ const (
 
 const (
 
+	// Logger.Defer() and Logger.DeferContext() will include the value returned
+	// by recover() when logging a panic.
+	RECOVERED = "recovered"
+
 	// Values of "stacktrace" attributes will be replaced with one-line stack
 	// traces for the function that called the given logging method.
 	STACKTRACE = "stacktrace"
@@ -137,19 +141,20 @@ func (l *Logger) BaseAttributes() []any
 func (l *Logger) BaseTags() []string
     Return the current base tags.
 
-func (l *Logger) Defer(finally Finally, recoverHandler RecoverHandler, attributes ...any)
+func (l *Logger) Defer(panicAgain bool, finally Finally, recoverHandler RecoverHandler, attributes ...any)
     See documentation for Logger.DeferContext().
 
-func (l *Logger) DeferContext(finally Finally, ctx context.Context, recoverHandler RecoverHandler, attributes ...any)
+func (l *Logger) DeferContext(panicAgain bool, finally Finally, ctx context.Context, recoverHandler RecoverHandler, attributes ...any)
     For use with defer to log if a panic occurs.
 
     If recover() returns non-nil, its value will be passed to handler.
 
-    Handler's first return value will be used as the msg string in writing a log
-    entry using l.Always().
+    Handler's return value will be used as the msg string in writing a log entry
+    using l.AlwaysContext().
 
-    If handler's second return value is not nil it will be passed to a
-    subsequent invocation of panic().
+    If panicAgain is true, any panics that occur while this deferred method is
+    in effect will be passed to panic() so as to cause the process to terminate
+    abnormally.
 
     For example, if the following is invoked in a goroutine that was passed a
     channel named ch:
@@ -157,10 +162,13 @@ func (l *Logger) DeferContext(finally Finally, ctx context.Context, recoverHandl
         name := stacktraces.FunctionName()
         defer logger.DeferContext(
 
+            // don't cause process to exit abnormally even if a panic occurs
+            false,
+
             // clean-up function is always invoked
             func() { close(ch) },
 
-            // remaining parameters are passed to logger.Always() when
+            // remaining parameters are passed to logger.AlwaysContext() when
             // recover() returns non-nil
 
             ctx,
@@ -171,16 +179,16 @@ func (l *Logger) DeferContext(finally Finally, ctx context.Context, recoverHandl
                 // so as to allow other goroutines to complete)
                 return fmt.Sprintf("%s recovered from %v", name, r), nil
             },
-            logging.TAGS, []string{"PANIC", "ERROR", "SEVERE"},
-            logging.STACKTRACE, name,
         )
 
-    the goroutine will close ch on exit and write a log entry whose msg is the
-    string representation of the value returned by recover() when a panic occurs
-    and then allow other goroutines to continue normally. If the second return
-    value from the handler is not nil, that value will be passed to panic()
-    after the clean up and logging functions are invoked. [See the documentation
-    for panic() / recover() for more information.]
+    the goroutine will close ch on exit and, if a panic occurs, write a log
+    entry whose msg is the string representation of the value returned by
+    recover()while allowing other goroutines to continue running normally.
+    If panicAgain were passed true, recovered value would be passed to panic()
+    after the clean up and logging functions were invoked. The value of
+    panicAgain is also used to determine whether or not panics in the clean-up
+    or message builder functions cause an abnormal exit. [See the documentation
+    for panic() and recover() for more information.]
 
 func (l *Logger) Enabled(verbosity Verbosity) bool
     Return true or false depending on whether or not the given verbosity is
@@ -225,14 +233,17 @@ func (l *Logger) Verbosity() Verbosity
 
 type LoggerOptions struct {
 
-	// Pass through to HandlerOptions for the wrapped slog.Logger.
-	AddSource bool
+	// Allow panics in Logger.log() to cause abnormal process termination.
+	AllowPanics bool
 
 	// Initial set of attributes that will be added to every log entry.
 	BaseAttributes []any
 
 	// Initial set of tags that will be added to every log entry.
 	BaseTags []string
+
+	// Pass through to HandlerOptions for the wrapped slog.Logger.
+	AddSource bool
 
 	// Shared slog.LevelVar, if desired; a Leveler will be created if this
 	// is nil.
@@ -254,69 +265,12 @@ type MessageBuilder func() string
     Such a function is invoked only if a given verbosity is enabled for a given
     logger.
 
-type RecoverHandler func(recovered any) (string, any)
+type RecoverHandler func(recovered any) string
     Type of function passed to Logger.Defer() and Logger.DeferContext() to allow
     for including the value returned by recover() in the log entry.
 
 type Verbosity int
     Verbosity-based nomenclature used in place of slog.Level.
-```
-
-## Overview
-
-The design of Go's standard `log/slog` package leaves much to be desired. This
-is a very thin wrapper that helps address some (but far from all) of its
-shortcomings.
-
-- [Streamlined syntax](#streamlined-syntax) for logger construction and usage
-
-  - Hard-code use of `slog.JSONHandler`
-
-  - Ensure `slog.LevelVar` exists for each logger
-
-  - Encapsulate `context.Context` for use with each logger
-
-  - Promote `slog.Level.Set` method to `logging.Logger` interface
-
-- [Lazy evaluation](#lazy-evaluation) of message formatting code using closures
-
-- [Verbosity-based nomenclature](#verbosity-based-nomenclature) rather than
-  conflating "verbosity of log output" with "severity of issue"
-
-- Support embedding [stack traces](#stack-traces) in log entries in a simple,
-  flexible way
-
-- Enhanced support for custom attributes
-
-  - Special handling of ["tags" attributes](#special-handling-of-tags)
-
-  - Declare [default tags and attributes](#default-tags-and-attributes) per
-    logger instance
-
-## Streamlined Syntax
-
-Use:
-
-```go
-// do this...
-
-logger := logging.New(os.Stdout, nil)
-logger.Set(logging.TRACE)
-```
-
-Rather than:
-
-```go
-// ...instead of this
-
-levelVar := slog.LevelVar{}
-
-handlerOptions := slog.HandlerOptions{
-    Level: &levelVar,
-}
-
-slogger := slog.New(slog.NewJSONHandler(os.Stdout, &handlerOptions))
-levelVar.Set(slog.LevelDebug)
 ```
 
 ## Lazy Evaluation
