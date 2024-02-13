@@ -236,16 +236,26 @@ func (l *Logger) AlwaysContext(ctx context.Context, message MessageBuilder, attr
 // See documentation for Logger.DeferContext().
 func (l *Logger) Defer(finally Finally, recoverHandler RecoverHandler, attributes ...any) {
 
-	defer writeRecoveryToStderr()
+	var recovered any
 
-	var r any
+	defer func() {
+		if r := recover(); r != nil {
+			l.wrapped.Error(
+				fmt.Sprintf("recovered from panic: %v", r),
+				STACKTRACE, stacktraces.ShortStackTrace(0),
+				TAGS, []string{"PANIC"})
+		}
+		if recovered != nil {
+			panic(recovered)
+		}
+	}()
 
-	if r = recover(); r != nil {
+	if recovered = recover(); recovered != nil {
 
 		msg := "panic"
 
 		if recoverHandler != nil {
-			msg, r = recoverHandler(r)
+			msg, recovered = recoverHandler(recovered)
 		}
 
 		l.Always(func() string { return msg }, attributes...)
@@ -253,10 +263,6 @@ func (l *Logger) Defer(finally Finally, recoverHandler RecoverHandler, attribute
 
 	if finally != nil {
 		finally()
-	}
-
-	if r != nil {
-		panic(r)
 	}
 }
 
@@ -302,16 +308,27 @@ func (l *Logger) Defer(finally Finally, recoverHandler RecoverHandler, attribute
 // panic() / recover() for more information.]
 func (l *Logger) DeferContext(finally Finally, ctx context.Context, recoverHandler RecoverHandler, attributes ...any) {
 
-	defer writeRecoveryToStderr()
+	var recovered any
 
-	var r any
+	defer func() {
+		if r := recover(); r != nil {
+			l.wrapped.ErrorContext(
+				ctx,
+				fmt.Sprintf("recovered from panic: %v", r),
+				STACKTRACE, stacktraces.ShortStackTrace(0),
+				TAGS, []string{"PANIC"})
+		}
+		if recovered != nil {
+			panic(recovered)
+		}
+	}()
 
-	if r = recover(); r != nil {
+	if recovered = recover(); recovered != nil {
 
 		msg := "panic"
 
 		if recoverHandler != nil {
-			msg, r = recoverHandler(r)
+			msg, recovered = recoverHandler(recovered)
 		}
 
 		l.AlwaysContext(ctx, func() string { return msg }, attributes...)
@@ -319,10 +336,6 @@ func (l *Logger) DeferContext(finally Finally, ctx context.Context, recoverHandl
 
 	if finally != nil {
 		finally()
-	}
-
-	if r != nil {
-		panic(r)
 	}
 }
 
@@ -378,7 +391,15 @@ func (l *Logger) log(ctx context.Context, verbosity Verbosity, message MessageBu
 
 	if l.wrapped.Enabled(ctx, slog.Level(verbosity)) {
 
-		defer writeRecoveryToStderr()
+		defer func() {
+			if r := recover(); r != nil {
+				l.wrapped.ErrorContext(
+					ctx,
+					fmt.Sprintf("recovered from panic: %v", r),
+					STACKTRACE, stacktraces.ShortStackTrace(0),
+					TAGS, []string{"PANIC"})
+			}
+		}()
 
 		msg := ""
 
@@ -448,7 +469,7 @@ func appendAttribute(attributes []any, key any, val any) []any {
 		fmt.Fprintf(os.Stderr,
 			"invalid log attribute key %v\n%s",
 			k,
-			stacktraces.LongStackTrace(3))
+			stacktraces.LongStackTrace(0))
 		return attributes
 	}
 }
@@ -547,19 +568,5 @@ func newAttrReplacer(oldReplacer func([]string, slog.Attr) slog.Attr) func([]str
 		}
 
 		return attr
-	}
-}
-
-// For use with defer inside logging functions.
-//
-// Write a stack trace to os.Stderr when a panic is handled and then resume
-// execution.
-func writeRecoveryToStderr() {
-	if r := recover(); r != nil {
-		fmt.Fprintf(
-			os.Stderr,
-			"recovered from panic while logging: %v\n%s",
-			r,
-			stacktraces.LongStackTrace(3))
 	}
 }
