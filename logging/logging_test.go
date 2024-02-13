@@ -91,81 +91,81 @@ func TestAlways(t *testing.T) {
 	err := json.Unmarshal(bytes, &entry)
 
 	if err != nil {
-		t.Fatalf("TestAlways: error unmarshaling log entry; %s", err.Error())
+		t.Fatalf("error unmarshaling log entry; %s", err.Error())
 	}
 
 	if !replacerCalled {
-		t.Fatalf("TestAlways: expected attribute replacer to have been called")
+		t.Fatalf("expected attribute replacer to have been called")
 	}
 
 	if !builderCalled {
-		t.Fatalf("TestAlways: expected message builder to havve been called")
+		t.Fatalf("expected message builder to havve been called")
 	}
 
 	_, err = time.Parse(time.RFC3339Nano, entry.Time)
 
 	if err != nil {
 		t.Fatalf(
-			"TestAlways: error parsing time '%s'; %s",
+			"error parsing time '%s'; %s",
 			entry.Time,
 			err.Error())
 	}
 
 	if entry.Verbosity != "ALWAYS" {
 		t.Fatalf(
-			"TestAlways: expected verbosity to be 'ALWAYS', got '%s'",
+			"expected verbosity to be 'ALWAYS', got '%s'",
 			entry.Verbosity)
 	}
 
 	if entry.Msg != "always" {
 		t.Fatalf(
-			"TestAlways: expected msg to be 'always', got '%s'",
+			"expected msg to be 'always', got '%s'",
 			entry.Msg)
 	}
 
 	if entry.Counters.Error1 != 1 {
 		t.Fatalf(
-			"TestAlways: expected Error1 to be 1, got %d",
+			"expected Error1 to be 1, got %d",
 			entry.Counters.Error1)
 	}
 
 	if entry.Counters.Error2 != 0 {
 		t.Fatalf(
-			"TestAlways: expected Error2 to be 0, got %d",
+			"expected Error2 to be 0, got %d",
 			entry.Counters.Error2)
 	}
 
 	name, _, err := firstFunction(entry.StackTrace)
 
 	if err != nil {
-		t.Fatalf("TestAlways: error parsing stack frames; %s", err.Error())
+		t.Fatalf("error parsing stack frames; %s", err.Error())
 	}
 
 	functionName := stacktraces.FunctionName()
 
 	if name != functionName {
-		t.Fatalf("TestAlways: expected first stack frame to be for '%s', got '%s'", functionName, name)
+		t.Fatalf("expected first stack frame to be for '%s', got '%s'", functionName, name)
 	}
 
 	if entry.StackTrace == "" {
-		t.Fatalf("TestAlways: expected stack trace not to be empty")
+		t.Fatalf("expected stack trace not to be empty")
 	}
 
 	combinedTags := append(baseTags, additionalTags...)
 
 	if len(entry.Tags) != len(combinedTags) {
-		t.Fatalf("TestAlways: expected length of %#v to be 2, got %d", entry.Tags, len(entry.Tags))
+		t.Fatalf("expected length of %#v to be 2, got %d", entry.Tags, len(entry.Tags))
 	}
 
 	for _, val := range combinedTags {
 
 		if !slices.Contains[[]string](entry.Tags, val) {
-			t.Fatalf("TestAlwas: expected %#v to contain '%s'", entry.Tags, val)
+			t.Fatalf("expected %#v to contain '%s'", entry.Tags, val)
 		}
 	}
 
 	if entry.Foo != "bar" {
-		t.Fatalf("TestAlways: expected foo to be 'bar', got '%s'", entry.Foo)
+		t.Fatalf("expected foo to be 'bar', got '%s'", entry.Foo)
 	}
 }
 
@@ -228,81 +228,81 @@ func TestAlwaysContext(t *testing.T) {
 	err := json.Unmarshal(bytes, &entry)
 
 	if err != nil {
-		t.Fatalf("TestAlways: error unmarshaling log entry; %s", err.Error())
+		t.Fatalf("error unmarshaling log entry; %s", err.Error())
 	}
 
 	if !replacerCalled {
-		t.Fatalf("TestAlways: expected attribute replacer to have been called")
+		t.Fatalf("expected attribute replacer to have been called")
 	}
 
 	if !builderCalled {
-		t.Fatalf("TestAlways: expected message builder to havve been called")
+		t.Fatalf("expected message builder to havve been called")
 	}
 
 	_, err = time.Parse(time.RFC3339Nano, entry.Time)
 
 	if err != nil {
 		t.Fatalf(
-			"TestAlways: error parsing time '%s'; %s",
+			"error parsing time '%s'; %s",
 			entry.Time,
 			err.Error())
 	}
 
 	if entry.Verbosity != "ALWAYS" {
 		t.Fatalf(
-			"TestAlways: expected verbosity to be 'ALWAYS', got '%s'",
+			"expected verbosity to be 'ALWAYS', got '%s'",
 			entry.Verbosity)
 	}
 
 	if entry.Msg != "always" {
 		t.Fatalf(
-			"TestAlways: expected msg to be 'always', got '%s'",
+			"expected msg to be 'always', got '%s'",
 			entry.Msg)
 	}
 
 	if entry.Counters.Error1 != 1 {
 		t.Fatalf(
-			"TestAlways: expected Error1 to be 1, got %d",
+			"expected Error1 to be 1, got %d",
 			entry.Counters.Error1)
 	}
 
 	if entry.Counters.Error2 != 0 {
 		t.Fatalf(
-			"TestAlways: expected Error2 to be 0, got %d",
+			"expected Error2 to be 0, got %d",
 			entry.Counters.Error2)
 	}
 
 	name, _, err := firstFunction(entry.StackTrace)
 
 	if err != nil {
-		t.Fatalf("TestAlways: error parsing stack frames; %s", err.Error())
+		t.Fatalf("error parsing stack frames; %s", err.Error())
 	}
 
 	functionName := stacktraces.FunctionName()
 
 	if name != functionName {
-		t.Fatalf("TestAlways: expected first stack frame to be for '%s', got '%s'", functionName, name)
+		t.Fatalf("expected first stack frame to be for '%s', got '%s'", functionName, name)
 	}
 
 	if entry.StackTrace == "" {
-		t.Fatalf("TestAlways: expected stack trace not to be empty")
+		t.Fatalf("expected stack trace not to be empty")
 	}
 
 	combinedTags := append(baseTags, additionalTags...)
 
 	if len(entry.Tags) != len(combinedTags) {
-		t.Fatalf("TestAlways: expected length of %#v to be 2, got %d", entry.Tags, len(entry.Tags))
+		t.Fatalf("expected length of %#v to be 2, got %d", entry.Tags, len(entry.Tags))
 	}
 
 	for _, val := range combinedTags {
 
 		if !slices.Contains[[]string](entry.Tags, val) {
-			t.Fatalf("TestAlwas: expected %#v to contain '%s'", entry.Tags, val)
+			t.Fatalf("expected %#v to contain '%s'", entry.Tags, val)
 		}
 	}
 
 	if entry.Foo != "bar" {
-		t.Fatalf("TestAlways: expected foo to be 'bar', got '%s'", entry.Foo)
+		t.Fatalf("expected foo to be 'bar', got '%s'", entry.Foo)
 	}
 }
 
@@ -421,12 +421,12 @@ func TestLazyEvaluation(t *testing.T) {
 	logger := New(writer, &options)
 
 	if logger.Enabled(TRACE) {
-		t.Fatalf("TestLazyEvaluation: expected TRACE to be disabled by default")
+		t.Fatalf("expected TRACE to be disabled by default")
 	}
 
 	logger.Trace(
 		func() string {
-			t.Fatalf("TestLazyEvaluation: msg builder should not be called")
+			t.Fatalf("msg builder should not be called")
 			return "error"
 		})
 
@@ -434,11 +434,11 @@ func TestLazyEvaluation(t *testing.T) {
 	b := buffer.Bytes()
 
 	if len(b) > 0 {
-		t.Fatalf("TestLazyEvaluation: no output should be written")
+		t.Fatalf("no output should be written")
 	}
 
 	if replacerCalled {
-		t.Fatalf("TestLazyEvaluation: replacer should not be called")
+		t.Fatalf("replacer should not be called")
 	}
 }
 
@@ -468,23 +468,23 @@ func TestTrace(t *testing.T) {
 	err := json.Unmarshal(b, &entry)
 
 	if err != nil {
-		t.Fatalf("TestTrace: error unmarshaling log entry; %s", err.Error())
+		t.Fatalf("error unmarshaling log entry; %s", err.Error())
 	}
 
 	if entry.Verbosity != "TRACE" {
 		t.Fatalf(
-			"TestTrace: expected verbosity 'TRACE', got '%s'",
+			"expected verbosity 'TRACE', got '%s'",
 			entry.Verbosity)
 	}
 
 	if entry.Msg != "trace" {
 		t.Fatalf(
-			"TestTrace: expected msg 'trace', got '%s'",
+			"expected msg 'trace', got '%s'",
 			entry.Msg)
 	}
 
 	if len(entry.Tags) != 0 {
-		t.Fatalf("TestTrace: expected no tags, got %#v", entry.Tags)
+		t.Fatalf("expected no tags, got %#v", entry.Tags)
 	}
 }
 
@@ -516,23 +516,23 @@ func TestTraceContext(t *testing.T) {
 	err := json.Unmarshal(b, &entry)
 
 	if err != nil {
-		t.Fatalf("TestTrace: error unmarshaling log entry; %s", err.Error())
+		t.Fatalf("error unmarshaling log entry; %s", err.Error())
 	}
 
 	if entry.Verbosity != "TRACE" {
 		t.Fatalf(
-			"TestTrace: expected verbosity 'TRACE', got '%s'",
+			"expected verbosity 'TRACE', got '%s'",
 			entry.Verbosity)
 	}
 
 	if entry.Msg != "trace" {
 		t.Fatalf(
-			"TestTrace: expected msg 'trace', got '%s'",
+			"expected msg 'trace', got '%s'",
 			entry.Msg)
 	}
 
 	if len(entry.Tags) != 0 {
-		t.Fatalf("TestTrace: expected no tags, got %#v", entry.Tags)
+		t.Fatalf("expected no tags, got %#v", entry.Tags)
 	}
 }
 
@@ -560,18 +560,18 @@ func TestFine(t *testing.T) {
 	err := json.Unmarshal(b, &entry)
 
 	if err != nil {
-		t.Fatalf("TestFine: error unmarshaling log entry; %s", err.Error())
+		t.Fatalf("error unmarshaling log entry; %s", err.Error())
 	}
 
 	if entry.Verbosity != "FINE" {
 		t.Fatalf(
-			"TestFine: expected verbosity 'FINE', got '%s'",
+			"expected verbosity 'FINE', got '%s'",
 			entry.Verbosity)
 	}
 
 	if entry.Msg != "fine" {
 		t.Fatalf(
-			"TestFine: expected msg 'fine', got '%s'",
+			"expected msg 'fine', got '%s'",
 			entry.Msg)
 	}
 }
@@ -602,18 +602,18 @@ func TestFineContext(t *testing.T) {
 	err := json.Unmarshal(b, &entry)
 
 	if err != nil {
-		t.Fatalf("TestFine: error unmarshaling log entry; %s", err.Error())
+		t.Fatalf("error unmarshaling log entry; %s", err.Error())
 	}
 
 	if entry.Verbosity != "FINE" {
 		t.Fatalf(
-			"TestFine: expected verbosity 'FINE', got '%s'",
+			"expected verbosity 'FINE', got '%s'",
 			entry.Verbosity)
 	}
 
 	if entry.Msg != "fine" {
 		t.Fatalf(
-			"TestFine: expected msg 'fine', got '%s'",
+			"expected msg 'fine', got '%s'",
 			entry.Msg)
 	}
 }
@@ -642,18 +642,18 @@ func TestOptional(t *testing.T) {
 	err := json.Unmarshal(b, &entry)
 
 	if err != nil {
-		t.Fatalf("TestOptional: error unmarshaling log entry; %s", err.Error())
+		t.Fatalf("error unmarshaling log entry; %s", err.Error())
 	}
 
 	if entry.Verbosity != "OPTIONAL" {
 		t.Fatalf(
-			"TestOptional: expected verbosity 'OPTIONAL', got '%s'",
+			"expected verbosity 'OPTIONAL', got '%s'",
 			entry.Verbosity)
 	}
 
 	if entry.Msg != "optional" {
 		t.Fatalf(
-			"TestOptional: expected msg 'optional', got '%s'",
+			"expected msg 'optional', got '%s'",
 			entry.Msg)
 	}
 }
@@ -684,18 +684,18 @@ func TestOptionalContext(t *testing.T) {
 	err := json.Unmarshal(b, &entry)
 
 	if err != nil {
-		t.Fatalf("TestOptional: error unmarshaling log entry; %s", err.Error())
+		t.Fatalf("error unmarshaling log entry; %s", err.Error())
 	}
 
 	if entry.Verbosity != "OPTIONAL" {
 		t.Fatalf(
-			"TestOptional: expected verbosity 'OPTIONAL', got '%s'",
+			"expected verbosity 'OPTIONAL', got '%s'",
 			entry.Verbosity)
 	}
 
 	if entry.Msg != "optional" {
 		t.Fatalf(
-			"TestOptional: expected msg 'optional', got '%s'",
+			"expected msg 'optional', got '%s'",
 			entry.Msg)
 	}
 }
@@ -725,19 +725,19 @@ func TestIntTag(t *testing.T) {
 	err := json.Unmarshal(b, &entry)
 
 	if err != nil {
-		t.Fatalf("TestIntTag: error unmarshaling log entry: %s", err.Error())
+		t.Fatalf("error unmarshaling log entry: %s", err.Error())
 	}
 
 	if len(entry.Tags) != 2 {
-		t.Fatalf("TestIntTag: expected 2 tags, got %d", len(entry.Tags))
+		t.Fatalf("expected 2 tags, got %d", len(entry.Tags))
 	}
 
 	if !slices.Contains[[]string](entry.Tags, "test") {
-		t.Fatalf("TestIntTag: expected %#v to contain 'test'", entry.Tags)
+		t.Fatalf("expected %#v to contain 'test'", entry.Tags)
 	}
 
 	if !slices.Contains[[]string](entry.Tags, "1") {
-		t.Fatalf("TestIntTag: expected %#v to contain 'test'", entry.Tags)
+		t.Fatalf("expected %#v to contain 'test'", entry.Tags)
 	}
 }
 
@@ -766,19 +766,19 @@ func TestStringTag(t *testing.T) {
 	err := json.Unmarshal(b, &entry)
 
 	if err != nil {
-		t.Fatalf("TestIntTag: error unmarshaling log entry: %s", err.Error())
+		t.Fatalf("error unmarshaling log entry: %s", err.Error())
 	}
 
 	if len(entry.Tags) != 2 {
-		t.Fatalf("TestIntTag: expected 2 tags, got %d", len(entry.Tags))
+		t.Fatalf("expected 2 tags, got %d", len(entry.Tags))
 	}
 
 	if !slices.Contains[[]string](entry.Tags, "test") {
-		t.Fatalf("TestIntTag: expected %#v to contain 'test'", entry.Tags)
+		t.Fatalf("expected %#v to contain 'test'", entry.Tags)
 	}
 
 	if !slices.Contains[[]string](entry.Tags, "foo") {
-		t.Fatalf("TestIntTag: expected %#v to contain 'test'", entry.Tags)
+		t.Fatalf("expected %#v to contain 'test'", entry.Tags)
 	}
 }
 
@@ -806,11 +806,11 @@ func TestUnrecognizedLevel(t *testing.T) {
 	err := json.Unmarshal(b, &entry)
 
 	if err != nil {
-		t.Fatalf("TestUnrecognizedLevel: error unmarshaling entry: %s", err.Error())
+		t.Fatalf("error unmarshaling entry: %s", err.Error())
 	}
 
 	if !strings.HasPrefix(entry.Verbosity, "ERROR+") {
-		t.Fatalf("TestUnrecognizedLevel: expected verbosity to start with 'ERROR+', got '%s'", entry.Verbosity)
+		t.Fatalf("expected verbosity to start with 'ERROR+', got '%s'", entry.Verbosity)
 	}
 }
 
