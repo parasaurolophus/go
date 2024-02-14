@@ -16,6 +16,9 @@ package stacktraces // import "parasaurolophus/go/stacktraces"
 
 FUNCTIONS
 
+func FunctionInfo() (string, string, int)
+    Return name, source file name and line number of the function that this one.
+
 func FunctionName() string
     Return the name of the function that called this one, i.e. the currently
     executing function from that function's point of view.
