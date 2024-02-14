@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
 	"parasaurolophus/go/stacktraces"
 )
 
@@ -478,7 +477,7 @@ func (l *Logger) log(ctx context.Context, verbosity Verbosity, message MessageBu
 }
 
 // Return the result of appending the given key / val to the given attributes,
-// so long as key is of type string.
+// so long as key is a string.
 //
 // Simply returns the given attributes list without appending anything if key is
 // not a string.
@@ -490,10 +489,6 @@ func appendAttribute(attributes []any, key any, val any) []any {
 		return append(attributes, k, val)
 
 	default:
-		fmt.Fprintf(os.Stderr,
-			"invalid log attribute key %v\n%s",
-			k,
-			stacktraces.LongStackTrace(0))
 		return attributes
 	}
 }
@@ -513,6 +508,9 @@ func appendTag(tags []string, tag any) []string {
 
 	case string:
 		return append(tags, v)
+
+	case fmt.Stringer:
+		return append(tags, v.String())
 
 	default:
 		return append(tags, fmt.Sprintf("%v", v))
