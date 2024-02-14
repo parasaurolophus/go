@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"parasaurolophus/go/stacktraces"
+	"strconv"
 )
 
 type (
@@ -122,6 +123,27 @@ var (
 	// Default context for logging from command-line applications and the like.
 	defaultContext = context.Background()
 )
+
+// Implement fmt.Stringer interface for Verbosity.
+func (v Verbosity) String() string {
+
+	switch v {
+	case TRACE:
+		return "TRACE"
+
+	case FINE:
+		return "FINE"
+
+	case OPTIONAL:
+		return "OPTIONAL"
+
+	case ALWAYS:
+		return "ALWAYS"
+
+	default:
+		return strconv.Itoa(int(v))
+	}
+}
 
 // Returns a newly created, wrapped instance of slog.Logger.
 //
@@ -555,36 +577,39 @@ func newAttrReplacer(oldReplacer func([]string, slog.Attr) slog.Attr) func([]str
 
 		if attr.Key == "level" {
 
-			switch attr.Value.String() {
+			const verbosityKey = "verbosity"
+			val := attr.Value.String()
 
-			case "DEBUG":
+			switch val {
+
+			case slog.LevelDebug.String():
 				return slog.Attr{
-					Key:   "verbosity",
-					Value: slog.StringValue("TRACE"),
+					Key:   verbosityKey,
+					Value: slog.StringValue(TRACE.String()),
 				}
 
-			case "INFO":
+			case slog.LevelInfo.String():
 				return slog.Attr{
-					Key:   "verbosity",
-					Value: slog.StringValue("FINE"),
+					Key:   verbosityKey,
+					Value: slog.StringValue(FINE.String()),
 				}
 
-			case "WARN":
+			case slog.LevelWarn.String():
 				return slog.Attr{
-					Key:   "verbosity",
-					Value: slog.StringValue("OPTIONAL"),
+					Key:   verbosityKey,
+					Value: slog.StringValue(OPTIONAL.String()),
 				}
 
-			case "ERROR":
+			case slog.LevelError.String():
 				return slog.Attr{
-					Key:   "verbosity",
-					Value: slog.StringValue("ALWAYS"),
+					Key:   verbosityKey,
+					Value: slog.StringValue(ALWAYS.String()),
 				}
 
 			default:
 				return slog.Attr{
-					Key:   "verbosity",
-					Value: slog.StringValue(fmt.Sprint(attr.Value.String())),
+					Key:   verbosityKey,
+					Value: slog.StringValue(val),
 				}
 			}
 		}

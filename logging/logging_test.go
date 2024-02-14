@@ -782,6 +782,47 @@ func TestStringTag(t *testing.T) {
 	}
 }
 
+func TestStringerTag(t *testing.T) {
+
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+
+	options := LoggerOptions{
+		BaseTags: []string{"test"},
+	}
+
+	logger := New(writer, &options)
+	logger.Always(nil, TAGS, TRACE)
+	writer.Flush()
+	b := buffer.Bytes()
+
+	type Entry struct {
+		Time      string   `json:"time"`
+		Verbosity string   `json:"verbosity"`
+		Msg       string   `json:"msg"`
+		Tags      []string `json:"tags"`
+	}
+
+	entry := Entry{}
+	err := json.Unmarshal(b, &entry)
+
+	if err != nil {
+		t.Fatalf("error unmarshaling log entry: %s", err.Error())
+	}
+
+	if len(entry.Tags) != 2 {
+		t.Fatalf("expected 2 tags, got %d", len(entry.Tags))
+	}
+
+	if !slices.Contains[[]string](entry.Tags, "test") {
+		t.Fatalf("expected %#v to contain 'test'", entry.Tags)
+	}
+
+	if !slices.Contains[[]string](entry.Tags, TRACE.String()) {
+		t.Fatalf("expected %#v to contain '%s'", entry.Tags, TRACE.String())
+	}
+}
+
 func TestUnrecognizedLevel(t *testing.T) {
 
 	buffer := bytes.Buffer{}
@@ -1403,5 +1444,66 @@ func TestPanicInHandlerContext(t *testing.T) {
 
 	if !slices.Contains[[]string](entry.Tags, "HANDLER") {
 		t.Fatalf("expected %v to contain 'HANDLER'", entry.Tags)
+	}
+}
+
+func TestTraceString(t *testing.T) {
+
+	s := TRACE.String()
+
+	if s != "TRACE" {
+		t.Fatalf("expected 'TRACE', got '%s'", s)
+	}
+}
+
+func TestFineString(t *testing.T) {
+
+	s := FINE.String()
+
+	if s != "FINE" {
+		t.Fatalf("expected 'FINE', got '%s'", s)
+	}
+}
+
+func TestOptionalString(t *testing.T) {
+
+	s := OPTIONAL.String()
+
+	if s != "OPTIONAL" {
+		t.Fatalf("expected 'OPTIONAL', got '%s'", s)
+	}
+}
+
+func TestAlwaysString(t *testing.T) {
+
+	s := ALWAYS.String()
+
+	if s != "ALWAYS" {
+		t.Fatalf("expected 'ALWAYS', got '%s'", s)
+	}
+}
+
+func TestUnrecognizedVerbosityString(t *testing.T) {
+
+	s := Verbosity(100).String()
+
+	if s != "100" {
+		t.Fatalf("expected '100', got '%s'", s)
+	}
+}
+
+func TestSetContext(t *testing.T) {
+
+	ctx := context.WithValue(context.Background(), "foo", "bar")
+
+	if defaultContext == ctx {
+		t.Fatalf("expected defaultContext not to equal a newly created one")
+	}
+
+	logger := New(os.Stderr, nil)
+	logger.SetContext(ctx)
+
+	if defaultContext != ctx {
+		t.Fatalf("expected defaultContext to be updated")
 	}
 }
