@@ -8,13 +8,9 @@ import (
 	"io"
 	"log/slog"
 	"parasaurolophus/go/stacktraces"
-	"strconv"
 )
 
 type (
-
-	// Verbosity-based nomenclature used in place of slog.Level.
-	Verbosity int
 
 	// Type of function passed to logging methods for lazy evaluation of message
 	// formatting.
@@ -33,31 +29,6 @@ type (
 	// allow for including the value returned by recover() in the log entry.
 	RecoverHandler func(recovered any) string
 
-	// Configuration parameters for an instance of Logger.
-	LoggerOptions struct {
-
-		// Allow panics in Logger.log() to cause abnormal process termination.
-		AllowPanics bool
-
-		// Initial set of attributes that will be added to every log entry.
-		BaseAttributes []any
-
-		// Initial set of tags that will be added to every log entry.
-		BaseTags []string
-
-		// Pass through to HandlerOptions for the wrapped slog.Logger.
-		AddSource bool
-
-		// Shared slog.LevelVar, if desired; a Leveler will be created if this
-		// is nil.
-		Level *slog.LevelVar
-
-		// If not nil, an attribute replacer function that will be called in
-		// addition to replacing "level" attributes with "verbosiy" and other
-		// special attribute handling.
-		ReplaceAttr func([]string, slog.Attr) slog.Attr
-	}
-
 	// Wrapper for an instance of slog.Logger.
 	Logger struct {
 
@@ -67,40 +38,6 @@ type (
 		// The wrapped slog.Logger.
 		wrapped *slog.Logger
 	}
-)
-
-// Mapping of Verbosity to slog.Level values.
-//
-// Generally, assume that only ALWAYS will be enabled in production environments
-// and that TRACE will never be enabled outside of development environments.
-const (
-
-	// Only emit a log entry when extremely verbose output is specified.
-	//
-	// Intended for use in development environments for focused debugging
-	// sessions. This should never be enabled outside of development
-	// environments. Any logging that might potentially reveal PII, SPI or
-	// critically sensitive security information must only be written at TRACE
-	// level in environments where only synthetic or redacted data is in use.
-	TRACE = Verbosity(slog.LevelDebug)
-
-	// Only emit a log entry when unusually verbose output is specified.
-	//
-	// Intended for use in development environments for everyday testing and
-	// troubleshooting prior to a release candidate being deployed.
-	FINE = Verbosity(slog.LevelInfo)
-
-	// Only emit a log entry when moderately verbose output is specified.
-	//
-	// Intended for use in testing and staging environments, e.g. during
-	// acceptance and regression tests before release to production.
-	OPTIONAL = Verbosity(slog.LevelWarn)
-
-	// Always emit a log entry.
-	//
-	// Intended for production environments to drive monitoring, alerting and
-	// reporting.
-	ALWAYS = Verbosity(slog.LevelError)
 )
 
 // Specially handled attributes.
@@ -123,27 +60,6 @@ var (
 	// Default context for logging from command-line applications and the like.
 	defaultContext = context.Background()
 )
-
-// Implement fmt.Stringer interface for Verbosity.
-func (v Verbosity) String() string {
-
-	switch v {
-	case TRACE:
-		return "TRACE"
-
-	case FINE:
-		return "FINE"
-
-	case OPTIONAL:
-		return "OPTIONAL"
-
-	case ALWAYS:
-		return "ALWAYS"
-
-	default:
-		return strconv.Itoa(int(v))
-	}
-}
 
 // Returns a newly created, wrapped instance of slog.Logger.
 //
@@ -198,26 +114,19 @@ func New(writer io.Writer, options *LoggerOptions) *Logger {
 	logger := new(Logger)
 
 	if options != nil {
-
-		logger.options.AllowPanics = options.AllowPanics
-		logger.options.BaseAttributes = options.BaseAttributes
-		logger.options.BaseTags = options.BaseTags
-		logger.options.AddSource = options.AddSource
-		logger.options.Level = options.Level
-		logger.options.ReplaceAttr = options.ReplaceAttr
-
+		logger.options = *options
 	}
 
 	if logger.options.Level == nil {
 		logger.options.Level = new(slog.LevelVar)
 	}
 
-	hndlrOpts := new(slog.HandlerOptions)
-	hndlrOpts.AddSource = logger.options.AddSource
-	hndlrOpts.Level = logger.options.Level
-	hndlrOpts.ReplaceAttr = newAttrReplacer(logger.options.ReplaceAttr)
+	handlerOptions := new(slog.HandlerOptions)
+	handlerOptions.AddSource = logger.options.AddSource
+	handlerOptions.Level = logger.options.Level
+	handlerOptions.ReplaceAttr = newAttrReplacer(logger.options.ReplaceAttr)
 
-	logger.wrapped = slog.New(slog.NewJSONHandler(writer, hndlrOpts))
+	logger.wrapped = slog.New(slog.NewJSONHandler(writer, handlerOptions))
 
 	return logger
 }

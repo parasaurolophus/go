@@ -7,32 +7,17 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"parasaurolophus/go/stacktraces"
+	"parasaurolophus/go/stacktraces_test"
 )
-
-func firstFunction(strackTrace string) (string, int, error) {
-
-	frame := strings.Split(strackTrace, "<")[0]
-	parts := strings.Split(frame, ":")
-
-	if len(parts) < 1 {
-		return "", 0, errors.New("no colon in stack frame")
-	}
-
-	name := strings.Trim(strings.Split(parts[1], "[")[0], " ")
-	n, err := strconv.Atoi(parts[0])
-	return name, n, err
-}
 
 func TestAlways(t *testing.T) {
 
@@ -135,7 +120,7 @@ func TestAlways(t *testing.T) {
 			entry.Counters.Error2)
 	}
 
-	name, _, err := firstFunction(entry.StackTrace)
+	name, _, err := stacktraces_test.FirstFunctionShort(entry.StackTrace)
 
 	if err != nil {
 		t.Fatalf("error parsing stack frames; %s", err.Error())
@@ -272,7 +257,7 @@ func TestAlwaysContext(t *testing.T) {
 			entry.Counters.Error2)
 	}
 
-	name, _, err := firstFunction(entry.StackTrace)
+	name, _, err := stacktraces_test.FirstFunctionShort(entry.StackTrace)
 
 	if err != nil {
 		t.Fatalf("error parsing stack frames; %s", err.Error())
@@ -384,7 +369,7 @@ func TestNilBuilder(t *testing.T) {
 			entry.Counters.Error2)
 	}
 
-	name, _, err := firstFunction(entry.StackTrace)
+	name, _, err := stacktraces_test.FirstFunctionShort(entry.StackTrace)
 
 	if err != nil {
 		t.Fatalf("error parsing stack trace: %s", err.Error())
@@ -963,7 +948,7 @@ func TestOddAttributes(t *testing.T) {
 	}
 
 	expected := stacktraces.FunctionName()
-	actual, _, err := firstFunction(entry.StackTrace)
+	actual, _, err := stacktraces_test.FirstFunctionShort(entry.StackTrace)
 
 	if err != nil {
 		t.Fatalf("error parsing stacktrace: %s", err.Error())
@@ -1057,7 +1042,7 @@ func TestDeferPanic(t *testing.T) {
 		t.Fatalf("expected msg to be 'deliberate', got '%s'", entry.Msg)
 	}
 
-	name, _, err := firstFunction(entry.StackTrace)
+	name, _, err := stacktraces_test.FirstFunctionShort(entry.StackTrace)
 
 	if err != nil {
 		t.Fatalf("error parsing stack trace: %s", err.Error())
@@ -1113,7 +1098,7 @@ func TestDeferPanicContext(t *testing.T) {
 		t.Fatalf("expected msg to be 'deliberate', got '%s'", entry.Msg)
 	}
 
-	name, _, err := firstFunction(entry.StackTrace)
+	name, _, err := stacktraces_test.FirstFunctionShort(entry.StackTrace)
 
 	if err != nil {
 		t.Fatalf("error parsing stack trace: %s", err.Error())
@@ -1447,54 +1432,13 @@ func TestPanicInHandlerContext(t *testing.T) {
 	}
 }
 
-func TestTraceString(t *testing.T) {
-
-	s := TRACE.String()
-
-	if s != "TRACE" {
-		t.Fatalf("expected 'TRACE', got '%s'", s)
-	}
-}
-
-func TestFineString(t *testing.T) {
-
-	s := FINE.String()
-
-	if s != "FINE" {
-		t.Fatalf("expected 'FINE', got '%s'", s)
-	}
-}
-
-func TestOptionalString(t *testing.T) {
-
-	s := OPTIONAL.String()
-
-	if s != "OPTIONAL" {
-		t.Fatalf("expected 'OPTIONAL', got '%s'", s)
-	}
-}
-
-func TestAlwaysString(t *testing.T) {
-
-	s := ALWAYS.String()
-
-	if s != "ALWAYS" {
-		t.Fatalf("expected 'ALWAYS', got '%s'", s)
-	}
-}
-
-func TestUnrecognizedVerbosityString(t *testing.T) {
-
-	s := Verbosity(100).String()
-
-	if s != "100" {
-		t.Fatalf("expected '100', got '%s'", s)
-	}
-}
-
 func TestSetContext(t *testing.T) {
 
-	ctx := context.WithValue(context.Background(), "foo", "bar")
+	type Key string
+
+	const Key1 Key = "key1"
+
+	ctx := context.WithValue(context.Background(), Key1, "value")
 
 	if defaultContext == ctx {
 		t.Fatalf("expected defaultContext not to equal a newly created one")
