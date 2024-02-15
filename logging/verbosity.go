@@ -3,7 +3,9 @@
 package logging
 
 import (
+	"fmt"
 	"log/slog"
+	"parasaurolophus/go/stacktraces"
 	"strconv"
 )
 
@@ -63,4 +65,43 @@ func (v Verbosity) String() string {
 	default:
 		return strconv.Itoa(int(v))
 	}
+}
+
+func (v *Verbosity) Scan(state fmt.ScanState, verb rune) error {
+
+	b, err := state.Token(true, nil)
+
+	if err != nil {
+
+		return err
+	}
+
+	token := string(b)
+
+	switch token {
+
+	case TRACE.String():
+		*v = TRACE
+
+	case FINE.String():
+		*v = FINE
+
+	case OPTIONAL.String():
+		*v = OPTIONAL
+
+	case ALWAYS.String():
+		*v = ALWAYS
+
+	default:
+
+		n, err := strconv.Atoi(token)
+
+		if err != nil {
+			return stacktraces.New(fmt.Sprintf("unsupported verbosity token: '%s'", token), nil)
+		}
+
+		*v = Verbosity(n)
+	}
+
+	return nil
 }
