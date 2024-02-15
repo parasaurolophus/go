@@ -18,6 +18,22 @@ CONSTANTS
 
 const (
 
+	// Logger.Defer() and Logger.DeferContext() will include the value returned
+	// by recover() when logging a panic.
+	RECOVERED = "recovered"
+
+	// Values of "stacktrace" attributes will be replaced with one-line stack
+	// traces for the function that called the given logging method.
+	STACKTRACE = "stacktrace"
+
+	// Value will be merged with the currently configured
+	// LoggerOptions.BaseTags.
+	TAGS = "tags"
+)
+    Specially handled attributes.
+
+const (
+
 	// Only emit a log entry when extremely verbose output is specified.
 	//
 	// Intended for use in development environments for focused debugging
@@ -50,22 +66,6 @@ const (
     Generally, assume that only ALWAYS will be enabled in production
     environments and that TRACE will never be enabled outside of development
     environments.
-
-const (
-
-	// Logger.Defer() and Logger.DeferContext() will include the value returned
-	// by recover() when logging a panic.
-	RECOVERED = "recovered"
-
-	// Values of "stacktrace" attributes will be replaced with one-line stack
-	// traces for the function that called the given logging method.
-	STACKTRACE = "stacktrace"
-
-	// Value will be merged with the currently configured
-	// LoggerOptions.BaseTags.
-	TAGS = "tags"
-)
-    Specially handled attributes.
 
 
 TYPES
@@ -271,6 +271,9 @@ type RecoverHandler func(recovered any) string
 
 type Verbosity int
     Verbosity-based nomenclature used in place of slog.Level.
+
+func (v Verbosity) String() string
+    Implement fmt.Stringer interface for Verbosity.
 ```
 
 ## Lazy Evaluation
