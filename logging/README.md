@@ -272,31 +272,10 @@ type RecoverHandler func(recovered any) string
 type Verbosity int
     Verbosity-based nomenclature used in place of slog.Level.
 
+func (v *Verbosity) Scan(state fmt.ScanState, verb rune) error
+
 func (v Verbosity) String() string
     Implement fmt.Stringer interface for Verbosity.
-```
-
-## Lazy Evaluation
-
-Use:
-
-```go
-// do this...
-
-logger.Fine(
-    func() string {
-        return fmt.Sprintf("log formatting overhead %#v", counters)
-    })
-```
-
-Rather than:
-
-```go
-// ...instead of this
-
-if slogger.Enabled(ctx, slog.LevelInfo) {
-    slogger.Info(fmt.Sprintf("log formatting overhead %#v", counters))
-}
 ```
 
 ## Verbosity Based Nomenclature
