@@ -10,10 +10,12 @@ import (
 )
 
 var (
+	sent = 0
 
 	// Specify the logger configuration.
 	loggerOptions = logging.LoggerOptions{
-		BaseTags: []string{"EXAMPLE"},
+		BaseTags:       []string{"EXAMPLE"},
+		BaseAttributes: []any{"sent", &sent},
 	}
 
 	// Create a logger.
@@ -110,6 +112,7 @@ func sender(ch chan int) {
 			panic("deliberate panic")
 		}
 
+		sent += 1
 		ch <- v
 	}
 }
