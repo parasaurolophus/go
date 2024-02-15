@@ -33,6 +33,21 @@ const (
 
 	// Capacity of address buffer passed to runtime.Callers().
 	maxDepth = 1024
+
+	// The default number of frames to skip when skipFrames is neither a string
+	// nor a positive int.
+	//
+	// This could change as a result of refactoring this or Go's standard
+	// runtime libraries. Current value of 3 is based on:
+	//
+	// 1. The function where the trace should start calls FunctionInfo(),
+	//    FunctionNameAt(), LongStackTrace(), ShortStackTrace() or New().
+	//
+	// 2. LongstackTrace(), ShortStackTrace() and New() call formatStackTrace()
+	//
+	// 3. formatStackTrace() calls runtime.Callers() and that is the first frame
+	//    on the stack.
+	defaultSkip = 3
 )
 
 // Convenience function for creating a multi-line trace of the current call
@@ -171,21 +186,6 @@ func shortFrameFormatter() stackFrameFormatter {
 // Returns multi-line and one-line string representations of the current call
 // stack.
 func formatStackTrace(skipFrames any, longFormatter stackFrameFormatter, shortFormatter stackFrameFormatter) (string, string) {
-
-	// The default number of frames to skip when skipFrames is neither a string
-	// nor a positive int.
-	//
-	// This could change as a result of refactoring this or Go's standard
-	// runtime libraries. Current value of 3 is based on:
-	//
-	// 1. The function where the trace should start calls LongStackTrace(),
-	//    ShortStackTrace() or New().
-	//
-	// 2. LongstackTrace(), ShortStackTrace() and New() call formatStackTrace()
-	//
-	// 3. formatStackTrace() calls runtime.Callers() and that is the first frame
-	//    on the stack.
-	const defaultSkip = 3
 
 	// in-memory writers in which the stack trace strings will be built
 	longBuffer := bytes.Buffer{}

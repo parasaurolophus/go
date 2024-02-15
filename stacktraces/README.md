@@ -16,12 +16,17 @@ package stacktraces // import "parasaurolophus/go/stacktraces"
 
 FUNCTIONS
 
-func FunctionInfo() (string, string, int)
+func FunctionInfo(skipFrames any) (string, string, int, error)
     Return name, source file name and line number of the function that this one.
 
 func FunctionName() string
     Return the name of the function that called this one, i.e. the currently
     executing function from that function's point of view.
+
+func FunctionNameAt(skipFrames any) (string, error)
+    Return the name of the function at the specified position in the current
+    call stack and nil, or the empty string and a StackTrack if no such function
+    is found.
 
 func LongStackTrace(skipFrames any) string
     Convenience function for creating a multi-line trace of the current call

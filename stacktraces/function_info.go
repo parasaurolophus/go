@@ -2,38 +2,72 @@
 
 package stacktraces
 
-import "runtime"
+import (
+	"fmt"
+	"runtime"
+)
 
 // Return the name of the function that called this one, i.e. the currently
 // executing function from that function's point of view.
 func FunctionName() string {
 
-	name, _, _ := functionInfo()
+	name, _, _, _ := functionInfo(nil)
 	return name
 }
 
-// Return name, source file name and line number of the function that this one.
-func FunctionInfo() (string, string, int) {
+// Return the name of the function at the specified position in the current call
+// stack and nil, or the empty string and a StackTrack if no such function is
+// found.
+func FunctionNameAt(skipFrames any) (string, error) {
 
-	return functionInfo()
+	name, _, _, err := functionInfo(skipFrames)
+	return name, err
+}
+
+// Return name, source file name and line number of the function that this one.
+func FunctionInfo(skipFrames any) (string, string, int, error) {
+
+	return functionInfo(skipFrames)
 }
 
 // Common implementation for FunctionName() and FunctionInfo()
-func functionInfo() (string, string, int) {
+func functionInfo(skipFrames any) (string, string, int, error) {
 
-	// The number of frames to skip is empirically derived and may change as a
-	// result of any refactoring of this function or Go's standard runtime
-	// library.
-	//
-	// The current value assumes that the first frame is runtime.Callers(), the
-	// second frame is this function and the third frame is one of the public
-	// wrappers for this function.
-	const skip = 3
+	var (
+		skip                     = 0
+		frameTest stackFrameTest = func(frame *runtime.Frame) bool { return true }
+	)
+
+	switch v := skipFrames.(type) {
+
+	case int:
+		if v < 0 {
+			skip = defaultSkip
+		} else {
+			skip = v
+		}
+
+	case string:
+		frameTest = skipUntil(v)
+
+	default:
+		skip = defaultSkip
+	}
 
 	pc := make([]uintptr, maxDepth)
 	n := runtime.Callers(skip, pc)
 	pc = pc[:n]
 	frames := runtime.CallersFrames(pc)
-	frame, _ := frames.Next()
-	return frame.Function, frame.File, frame.Line
+
+	for {
+		frame, more := frames.Next()
+
+		if frameTest(&frame) {
+			return frame.Function, frame.File, frame.Line, nil
+		}
+
+		if !more {
+			return "", "", 0, New(fmt.Sprintf("no frame found for %v", skipFrames), nil)
+		}
+	}
 }

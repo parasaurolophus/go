@@ -356,7 +356,7 @@ func TestShortStackTraceInt(t *testing.T) {
 
 func TestShortStackTraceString(t *testing.T) {
 
-	expected, _, _ := FunctionInfo()
+	expected, _, _, _ := FunctionInfo(nil)
 	trace := ShortStackTrace(expected)
 	actual, _, err := stacktraces_test.FirstFunctionShort(trace)
 
