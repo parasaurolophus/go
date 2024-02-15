@@ -17,12 +17,26 @@ func TestStackTrace(t *testing.T) {
 	switch v := err.(type) {
 	case StackTrace:
 		trace := v.LongTrace()
-		if !strings.HasPrefix(trace, "0:runtime.Callers") {
-			t.Fatalf("expected long trace to start with '0:runtime.Callers()', got '%s'", trace)
+		actual, n, e := stacktraces_test.FirstFunctionLong(trace)
+		if e != nil {
+			t.Fatalf("error parsing long stack trace: %s", e.Error())
+		}
+		if n != 0 {
+			t.Fatalf("expected first frame to be 0, got %d", n)
+		}
+		if actual != "runtime.Callers" {
+			t.Fatalf("expected first frame to be 'runtime.Callers', got '%s'", actual)
 		}
 		trace = v.ShortTrace()
-		if !strings.HasPrefix(trace, "0:runtime.Callers") {
-			t.Fatalf("expected short trace to start with '0:runtime.Callers()', got '%s'", trace)
+		actual, n, e = stacktraces_test.FirstFunctionShort(trace)
+		if e != nil {
+			t.Fatalf("error parsing short stack trace: %s", e.Error())
+		}
+		if n != 0 {
+			t.Fatalf("expected first frame to be 0, got %d", n)
+		}
+		if actual != "runtime.Callers" {
+			t.Fatalf("expected first frame to be 'runtime.Callers', got '%s'", actual)
 		}
 
 	default:
@@ -37,21 +51,21 @@ func TestStackTrace(t *testing.T) {
 	}
 }
 
-func TestStackFrameNameNotFound(t *testing.T) {
+func TestShortTraceNameNotFound(t *testing.T) {
 
-	trace := New("", "fubar").ShortTrace()
+	trace := New("", "stacktraces.LongTrace").ShortTrace()
 
 	if trace != "" {
 		t.Fatalf("expected empty stack trace, got '%s", trace)
 	}
 }
 
-func TestStackTraceString(t *testing.T) {
+func TestStackTraceByName(t *testing.T) {
 
 	var expected string
 
 	_, err := func() (any, error) {
-		expected, _, _ = FunctionInfo()
+		expected = FunctionName()
 		return nil, New("test", expected)
 	}()
 
@@ -59,25 +73,25 @@ func TestStackTraceString(t *testing.T) {
 
 	case StackTrace:
 		trace := v.LongTrace()
-		functionName, _, err := stacktraces_test.FirstFunctionLong(trace)
+		actual, _, err := stacktraces_test.FirstFunctionLong(trace)
 
 		if err != nil {
 			t.Fatalf("error parsing stack frames; %s", err.Error())
 		}
 
-		if functionName != expected {
-			t.Fatalf("expected long trace to start with '%s', got '%s'", expected, functionName)
+		if actual != expected {
+			t.Fatalf("expected long trace to start with '%s', got '%s'", expected, actual)
 		}
 
 		trace = v.ShortTrace()
-		functionName, _, err = stacktraces_test.FirstFunctionShort(trace)
+		actual, _, err = stacktraces_test.FirstFunctionShort(trace)
 
 		if err != nil {
 			t.Fatalf("TestAlways: error parsing stack frames; %s", err.Error())
 		}
 
-		if functionName != expected {
-			t.Fatalf("expected short trace to start with '%s', got '%s'", expected, functionName)
+		if actual != expected {
+			t.Fatalf("expected short trace to start with '%s', got '%s'", expected, actual)
 		}
 
 	default:
@@ -127,7 +141,7 @@ func TestStackTraceNameNotFound(t *testing.T) {
 	}
 }
 
-func TestStackTraceDepth(t *testing.T) {
+func TestTraceDepth(t *testing.T) {
 
 	trace := New("test", 100)
 
@@ -146,10 +160,10 @@ func TestStackTraceDepth(t *testing.T) {
 
 func TestStackTraceFloat(t *testing.T) {
 
-	functionName, _, _ := FunctionInfo()
-	expected := functionName + ".func1"
+	var expected string
 
 	_, stacktrace := func() (any, StackTrace) {
+		expected = FunctionName()
 		return nil, New("test", 1.1)
 	}()
 
@@ -186,7 +200,7 @@ func TestStackTraceFloat(t *testing.T) {
 
 func TestStackTraceAuto(t *testing.T) {
 
-	functionName, _, _ := FunctionInfo()
+	functionName := FunctionName()
 	trace := New("test", -1)
 	long := trace.LongTrace()
 	short := trace.ShortTrace()
@@ -221,7 +235,7 @@ func TestStackTraceAuto(t *testing.T) {
 
 func TestLongStackTraceAuto(t *testing.T) {
 
-	functionName, _, _ := FunctionInfo()
+	functionName := FunctionName()
 	trace := LongStackTrace(-1)
 	name, n, err := stacktraces_test.FirstFunctionLong(trace)
 
@@ -240,38 +254,67 @@ func TestLongStackTraceAuto(t *testing.T) {
 
 func TestLongStackTraceInt(t *testing.T) {
 
-	trace := LongStackTrace(0)
-	name, n, err := stacktraces_test.FirstFunctionLong(trace)
+	trace1 := LongStackTrace(4)
+	_, m, err := stacktraces_test.FirstFunctionLong(trace1)
 
 	if err != nil {
-		t.Fatalf("error parsing full stack trace; %s", err.Error())
+		t.Fatalf("error parsing stack trace; %s", err.Error())
 	}
 
-	if n != 0 {
-		t.Fatalf("expected first frame in full stack trace to be 0, got %d", n)
+	if m != 4 {
+		t.Fatalf("expected first frame to be 4, got %d", m)
 	}
 
-	if name != "runtime.Callers" {
-		t.Fatalf("expected first function to be 'runtime.Callers', got '%s'", name)
+	trace2 := LongStackTrace(5)
+	_, n, err := stacktraces_test.FirstFunctionLong(trace2)
+
+	if err != nil {
+		t.Fatalf("error parsing stack trace; %s", err.Error())
+	}
+
+	if n != 5 {
+		t.Fatalf("expected first frame to be 5, got %d", n)
+	}
+
+	diff := n - m
+
+	if diff != 1 {
+		t.Fatalf("expected 1 more frame in trace1 than trace2, got %d", diff)
+	}
+
+	if !strings.HasSuffix(trace1, trace2) {
+
+		t.Fatalf("expected '%s' to be a suffix of '%s'", trace2, trace1)
 	}
 }
 
 func TestLongStackTraceString(t *testing.T) {
 
-	name, _, _ := FunctionInfo()
-	trace := LongStackTrace(name)
+	expected := FunctionName()
+	trace := LongStackTrace(expected)
+	actual, _, err := stacktraces_test.FirstFunctionLong(trace)
 
-	if trace == "" {
-		t.Fatalf("expected trace not to be empty")
+	if err != nil {
+		t.Fatalf("error parsing stack trace: %s", err.Error())
+	}
+
+	if actual != expected {
+		t.Fatalf("expected function name to be '%s', got '%s'", expected, actual)
 	}
 }
 
 func TestLongStackTraceFloat(t *testing.T) {
 
+	expected := FunctionName()
 	trace := LongStackTrace(12.7)
+	actual, _, err := stacktraces_test.FirstFunctionLong(trace)
 
-	if trace == "" {
-		t.Fatalf("expected trace not to be empty")
+	if err != nil {
+		t.Fatalf("error parsing stack trace: %s", err.Error())
+	}
+
+	if actual != expected {
+		t.Fatalf("expected function name to be '%s', got '%s'", expected, actual)
 	}
 }
 
@@ -315,28 +358,28 @@ func TestShortStackTraceString(t *testing.T) {
 
 	expected, _, _ := FunctionInfo()
 	trace := ShortStackTrace(expected)
-	name, _, err := stacktraces_test.FirstFunctionShort(trace)
+	actual, _, err := stacktraces_test.FirstFunctionShort(trace)
 
 	if err != nil {
 		t.Fatalf("error parsing frame; %s", err.Error())
 	}
 
-	if name != expected {
-		t.Fatalf("expected trace to start with '%s', got '%s'", expected, name)
+	if actual != expected {
+		t.Fatalf("expected trace to start with '%s', got '%s'", expected, actual)
 	}
 }
 
 func TestShortStackTraceFloat(t *testing.T) {
 
+	expected := FunctionName()
 	trace := ShortStackTrace(12.7)
-	functionName, _, _ := FunctionInfo()
-	name, _, err := stacktraces_test.FirstFunctionShort(trace)
+	actual, _, err := stacktraces_test.FirstFunctionShort(trace)
 
 	if err != nil {
 		t.Fatalf("error parsing short stack trace: %s", err.Error())
 	}
 
-	if name != functionName {
-		t.Fatalf("expected trace to start with '%s', got '%s'", functionName, trace)
+	if actual != expected {
+		t.Fatalf("expected trace to start with '%s', got '%s'", expected, trace)
 	}
 }
