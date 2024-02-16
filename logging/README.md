@@ -5,12 +5,8 @@ _Copyright &copy; Kirk Rader 2024_
 Note: the primary source of documentation for this library is in the form of
 inline comments that can be viewed using `go doc`.
 
-```bash
-cd logging
-go doc -all
 ```
-
-```
+$ go doc -all
 package logging // import "parasaurolophus/go/logging"
 
 

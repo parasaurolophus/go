@@ -15,6 +15,13 @@ This repository is organized as a Go module with three packages:
 * [example](./example) defines a stand-alone executable (a `main()` function in
   package `main`) that demonstrates the use of these packages
 
+```mermaid
+graph TB
+  example --> logging
+  example --> stacktraces
+  logging --> stacktraces
+```
+
 See [example/README.md](./example/README.md),
 [logging/README.md](./logging/README.md) and
 [stacktraces/README.md](./stacktraces/README.md) for more information.

@@ -22,3 +22,5 @@ go.work
 
 # local-only directory for experimentation, manual testing etc.
 scratch/
+
+.vscode/

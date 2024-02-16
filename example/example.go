@@ -7,112 +7,123 @@ import (
 	"os"
 	"parasaurolophus/go/logging"
 	"parasaurolophus/go/stacktraces"
+	"strconv"
 )
 
 var (
+	// The number of values sent by a goroutine.
 	sent = 0
+	// The number of values received from the goroutine.
+	received = 0
 
-	// Specify the logger configuration.
 	loggerOptions = logging.LoggerOptions{
-		BaseTags:       []string{"EXAMPLE"},
-		BaseAttributes: []any{"sent", &sent},
+		BaseTags: []string{"EXAMPLE"},
+		BaseAttributes: []any{
+			"sent", &sent,
+			"received", &received,
+		},
 	}
 
-	// Create a logger.
 	logger = logging.New(os.Stdout, &loggerOptions)
-
-	// Conventional tags when logging a panic.
-	panicTags = []string{"PANIC", "ERROR", "SEVERE"}
 )
 
+// Print the number of values sent by and received from a goroutine to stdout.
+//
+// Logging verbosity defaults to OPTIONAL but may be set using a command-line
+// argument.
 func main() {
-
-	// enable most verbose logging
-	logger.SetVerbosity(logging.TRACE)
-
-	// for use as the parameter to a log entry's "stacktrace" attribute
+	verbosity := logging.OPTIONAL
+	panicInMain := false
+	panicAgain := true
+	parseArg(1, "logging.Verbosity", &verbosity)
+	parseArg(2, "bool", &panicInMain)
+	parseArg(3, "bool", &panicAgain)
+	fmt.Printf("\nverbosity: %s, panicInMain: %v, panicAgain: %v\n\n", verbosity, panicInMain, panicAgain)
+	logger.SetVerbosity(verbosity)
 	functionName := stacktraces.FunctionName()
-
 	defer logger.Defer(
-
-		// panics in main.main should cause abnormal termination
-		true,
-
-		// no clean-up required for main.main since sender() will close the
-		// channel passed to it
-		nil,
-
-		// remaining parameters would be passed to logger.Always() if recover()
-		// returned non-nil in main.main
-
-		func(r any) string {
-			return fmt.Sprintf("%s recovered from '%v'", functionName, r)
+		panicAgain,
+		func() {
+			logger.Optional(nil, logging.TAGS, "DEBUG")
 		},
-
-		// add conventional attributes for logging a panic
+		func(r any) string {
+			return fmt.Sprintf("%s panicing: %v", functionName, r)
+		},
 		logging.STACKTRACE, functionName,
-		logging.TAGS, panicTags,
-	)
+		logging.TAGS, []string{"PANIC", "SEVERE"})
 
-	// make a channel for receiving values from a goroutine
 	ch := make(chan int)
-
-	logger.Trace(func() string { return fmt.Sprintf("%s starting goroutine", functionName) })
+	logger.Trace(
+		func() string { return fmt.Sprintf("%s starting sender goroutine", functionName) },
+		logging.TAGS, "DEBUG")
 	go sender(ch)
-
-	logger.Trace(func() string { return fmt.Sprintf("%s consuming output from goroutine", functionName) })
-
-	// consume values from the goroutine until ch is closed
+	logger.Trace(
+		func() string { return fmt.Sprintf("%s consuming output from sender goroutine", functionName) },
+		logging.TAGS, "DEBUG")
 	for v := range ch {
-
-		fmt.Println(v)
+		received += 1
+		logger.Fine(func() string { return strconv.Itoa(v) })
 	}
-
+	fmt.Printf("\n%d sent, %d received\n\n", sent, received)
+	if panicInMain {
+		panic("another deliberate panic")
+	}
 	logger.Trace(func() string { return fmt.Sprintf("%s exiting normally", functionName) })
 }
 
-// Demonstrate logging from a goroutine, including logging and recovering from a
-// panic.
+// Goroutine that sends int values to a channel.
+//
+// This deliberately panics after sending a few values as a demonstration of
+// logging.Logger.Defer().
 func sender(ch chan int) {
-
 	functionName := stacktraces.FunctionName()
-
 	defer logger.Defer(
-
-		// log but otherwise ignore panics in this goroutine
 		false,
-
-		// clean-up function is always called when this function exits
 		func() {
-			logger.Trace(func() string { return fmt.Sprintf("%s closing channel", functionName) })
+			logger.Trace(func() string { return fmt.Sprintf("%s goroutine closing channel", functionName) })
 			close(ch)
 		},
-
-		// remaining arguments are passed to logger.AlwaysContext() when
-		// recover() returns non-nil
-
 		func(recovered any) string {
-			// return nil as second value when panicing in a goroutine so that
-			// others can complete normally
-			return fmt.Sprintf("%s recovered from '%v'", functionName, recovered)
+			return fmt.Sprintf("%s recovered from: %v", functionName, recovered)
 		},
-
-		// include conventional attributes for logging panics
 		logging.STACKTRACE, functionName,
-		logging.TAGS, panicTags,
+		logging.TAGS, []string{"PANIC", "MEDIUM"},
 	)
-
-	// send values to ch's consumer, triggering a panic at some point along the
-	// way
 	for v := 0; v < 10; v++ {
-
 		if v > 4 {
-			// deliberately trigger a panic to demonstrate logger.Defer()
 			logger.Trace(func() string { return "sender deliberately causing a panic" })
 			panic("deliberate panic")
 		}
-
 		sent += 1
 		ch <- v
 	}
+}
+
+func parseArg(index int, typeName string, val any) {
+	if len(os.Args) <= index {
+		logger.Fine(
+			func() string { return fmt.Sprintf("optional argument %d (of type %s) not supplied", index, typeName) },
+			logging.TAGS, "DEBUG")
+		return
+	}
+	n, err := fmt.Sscan(os.Args[index], val)
+	if err != nil {
+		logger.Optional(
+			func() string { return err.Error() },
+			logging.STACKTRACE, nil,
+			logging.TAGS, []string{"ERROR", "USER", "BAD_ARGS"},
+		)
+		os.Exit(1)
+	}
+	if n != 1 {
+		logger.Optional(
+			func() string { return fmt.Sprintf("expected 1 %s, got %d", typeName, n) },
+			logging.STACKTRACE, nil,
+			logging.TAGS, []string{"ERROR", "USER", "BAD_ARGS"},
+		)
+		os.Exit(1)
+	}
+	logger.Trace(
+		func() string { return fmt.Sprintf("parsed arg %d: %v", index, val) },
+		logging.TAGS, "DEBUG")
 }

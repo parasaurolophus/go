@@ -549,7 +549,7 @@ func TestAlwaysContext(t *testing.T) {
 	}
 }
 
-func TestDeferPanic(t *testing.T) {
+func TestDeferHandler(t *testing.T) {
 
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
@@ -584,6 +584,7 @@ func TestDeferPanic(t *testing.T) {
 		Verbosity  string `json:"verbosity"`
 		Msg        string `json:"msg"`
 		StackTrace string `json:"stacktrace"`
+		Recovered  string `json:"recovered"`
 	}
 
 	entry := Entry{}
@@ -597,6 +598,10 @@ func TestDeferPanic(t *testing.T) {
 		t.Fatalf("expected msg to be 'deliberate', got '%s'", entry.Msg)
 	}
 
+	if entry.Recovered != "deliberate" {
+		t.Fatalf("expected recovered to be 'deliberate', got '%s'", entry.Recovered)
+	}
+
 	name, _, err := stacktraces_test.FirstFunctionShort(entry.StackTrace)
 
 	if err != nil {
@@ -608,7 +613,7 @@ func TestDeferPanic(t *testing.T) {
 	}
 }
 
-func TestDeferPanicContext(t *testing.T) {
+func TestDeferContextHandler(t *testing.T) {
 
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
@@ -640,6 +645,7 @@ func TestDeferPanicContext(t *testing.T) {
 		Verbosity  string `json:"verbosity"`
 		Msg        string `json:"msg"`
 		StackTrace string `json:"stacktrace"`
+		Recovered  string `json:"recovered"`
 	}
 
 	entry := Entry{}
@@ -651,6 +657,133 @@ func TestDeferPanicContext(t *testing.T) {
 
 	if entry.Msg != "deliberate" {
 		t.Fatalf("expected msg to be 'deliberate', got '%s'", entry.Msg)
+	}
+
+	if entry.Recovered != "deliberate" {
+		t.Fatalf("expected recovered to be 'deliberate', got '%s'", entry.Recovered)
+	}
+
+	name, _, err := stacktraces_test.FirstFunctionShort(entry.StackTrace)
+
+	if err != nil {
+		t.Fatalf("error parsing stack trace: %s", err.Error())
+	}
+
+	if name != expectedName {
+		t.Fatalf("expected stack trace to start with '%s', got '%s'", expectedName, name)
+	}
+}
+
+func TestDeferNilHandler(t *testing.T) {
+
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+	logger := New(writer, nil)
+	finallyRan := false
+	expectedName := ""
+
+	panicWithDefer := func() {
+		expectedName = stacktraces.FunctionName()
+		defer logger.Defer(
+			false,
+			func() {
+				finallyRan = true
+			},
+			nil,
+			STACKTRACE, expectedName)
+		panic("deliberate")
+	}
+
+	panicWithDefer()
+	writer.Flush()
+	b := buffer.Bytes()
+
+	if !finallyRan {
+		t.Fatalf("expected finally to have been invoked")
+	}
+
+	type Entry struct {
+		Time       string `json:"time"`
+		Verbosity  string `json:"verbosity"`
+		Msg        string `json:"msg"`
+		StackTrace string `json:"stacktrace"`
+		Recovered  string `json:"recovered"`
+	}
+
+	entry := Entry{}
+	err := json.Unmarshal(b, &entry)
+
+	if err != nil {
+		t.Fatalf("error unmarshaling log entry: %s", err.Error())
+	}
+
+	if entry.Msg != "" {
+		t.Fatalf("expected msg to be empty, got '%s'", entry.Msg)
+	}
+
+	if entry.Recovered != "deliberate" {
+		t.Fatalf("expected recovered to be 'deliberate', got '%s'", entry.Recovered)
+	}
+
+	name, _, err := stacktraces_test.FirstFunctionShort(entry.StackTrace)
+
+	if err != nil {
+		t.Fatalf("error parsing stack trace: %s", err.Error())
+	}
+
+	if name != expectedName {
+		t.Fatalf("expected stack trace to start with '%s', got '%s'", expectedName, name)
+	}
+}
+
+func TestDeferContextNilHandler(t *testing.T) {
+
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+	logger := New(writer, nil)
+	finallyRan := false
+	expectedName := ""
+
+	panicWithDefer := func() {
+		expectedName = stacktraces.FunctionName()
+		defer logger.DeferContext(
+			false,
+			func() { finallyRan = true },
+			context.Background(),
+			nil,
+			STACKTRACE, expectedName)
+		panic("deliberate")
+	}
+
+	panicWithDefer()
+	writer.Flush()
+	b := buffer.Bytes()
+
+	if !finallyRan {
+		t.Fatalf("expected 'finally' to have been execcuted")
+	}
+
+	type Entry struct {
+		Time       string `json:"time"`
+		Verbosity  string `json:"verbosity"`
+		Msg        string `json:"msg"`
+		StackTrace string `json:"stacktrace"`
+		Recovered  string `json:"recovered"`
+	}
+
+	entry := Entry{}
+	err := json.Unmarshal(b, &entry)
+
+	if err != nil {
+		t.Fatalf("error unmarshaling log entry: %s", err.Error())
+	}
+
+	if entry.Msg != "" {
+		t.Fatalf("expected msg to be empty, got '%s'", entry.Msg)
+	}
+
+	if entry.Recovered != "deliberate" {
+		t.Fatalf("expected recovered to be 'deliberate', got '%s'", entry.Recovered)
 	}
 
 	name, _, err := stacktraces_test.FirstFunctionShort(entry.StackTrace)
@@ -1106,329 +1239,6 @@ func TestBadKey(t *testing.T) {
 
 	if entry.Good2 != 2 {
 		t.Fatalf("expected value of 'good2' to be 2, got %d", entry.Good2)
-	}
-}
-
-func TestPanicInMessage(t *testing.T) {
-
-	buffer := bytes.Buffer{}
-	writer := bufio.NewWriter(&buffer)
-	logger := New(writer, nil)
-
-	logger.Always(
-		func() string {
-			panic("deliberate")
-		})
-
-	writer.Flush()
-	b := buffer.Bytes()
-
-	type Entry struct {
-		Time       string   `json:"time"`
-		Msg        string   `json:"msg"`
-		StackTrace string   `json:"stacktrace"`
-		Tags       []string `json:"tags"`
-	}
-
-	entry := Entry{}
-	err := json.Unmarshal(b, &entry)
-
-	if err != nil {
-		t.Fatalf("error unmarshaling entry: %v", err.Error())
-	}
-
-	if entry.Msg != "recovered: deliberate" {
-		t.Fatalf(
-			"expected msg to be 'recovered: deliberate', got '%s'",
-			entry.Msg)
-	}
-
-	if !slices.Contains[[]string](entry.Tags, "PANIC") {
-		t.Fatalf("expected %v to contain 'PANIC'", entry.Tags)
-	}
-}
-
-func TestPanicInMessageContext(t *testing.T) {
-
-	buffer := bytes.Buffer{}
-	writer := bufio.NewWriter(&buffer)
-	logger := New(writer, nil)
-
-	logger.AlwaysContext(
-		context.Background(),
-		func() string {
-			panic("deliberate")
-		})
-
-	writer.Flush()
-	b := buffer.Bytes()
-
-	type Entry struct {
-		Time       string   `json:"time"`
-		Msg        string   `json:"msg"`
-		StackTrace string   `json:"stacktrace"`
-		Tags       []string `json:"tags"`
-	}
-
-	entry := Entry{}
-	err := json.Unmarshal(b, &entry)
-
-	if err != nil {
-		t.Fatalf("error unmarshaling entry: %v", err.Error())
-	}
-
-	if entry.Msg != "recovered: deliberate" {
-		t.Fatalf(
-			"expected msg to be 'recovered: deliberate', got '%s'",
-			entry.Msg)
-	}
-
-	if !slices.Contains[[]string](entry.Tags, "PANIC") {
-		t.Fatalf("expected %v to contain 'PANIC'", entry.Tags)
-	}
-}
-
-func TestPanicInFinally(t *testing.T) {
-
-	buffer := bytes.Buffer{}
-	writer := bufio.NewWriter(&buffer)
-	logger := New(writer, nil)
-	finallyRan := false
-	handlerRan := false
-
-	panicInFinally := func() {
-		defer logger.Defer(
-			false,
-			func() {
-				finallyRan = true
-				panic("deliberate")
-			},
-			func(recovered any) string {
-				handlerRan = true
-				return fmt.Sprint(recovered)
-			},
-		)
-	}
-
-	panicInFinally()
-
-	writer.Flush()
-	b := buffer.Bytes()
-
-	if !finallyRan {
-		t.Fatalf("expected finally to have been invoked")
-	}
-
-	if handlerRan {
-		t.Fatalf("expected recovery handler not to have been invoked")
-	}
-
-	type Entry struct {
-		Time       string   `json:"time"`
-		Msg        string   `json:"msg"`
-		StackTrace string   `json:"stacktrace"`
-		Tags       []string `json:"tags"`
-	}
-
-	entry := Entry{}
-	err := json.Unmarshal(b, &entry)
-
-	if err != nil {
-		t.Fatalf("error unmarshaling entry: %v", err.Error())
-	}
-
-	if entry.Msg != "recovered: deliberate" {
-		t.Fatalf(
-			"expected msg to be 'recovered: deliberate', got '%s'",
-			entry.Msg)
-	}
-
-	if !slices.Contains[[]string](entry.Tags, "PANIC") {
-		t.Fatalf("expected %v to contain 'PANIC'", entry.Tags)
-	}
-
-	if !slices.Contains[[]string](entry.Tags, "FINALLY") {
-		t.Fatalf("expected %v to contain 'FINALLY'", entry.Tags)
-	}
-}
-
-func TestPanicInFinallyContext(t *testing.T) {
-
-	buffer := bytes.Buffer{}
-	writer := bufio.NewWriter(&buffer)
-	logger := New(writer, nil)
-	finallyRan := false
-	handlerRan := false
-
-	panicInFinally := func() {
-		defer logger.DeferContext(
-			false,
-			func() {
-				finallyRan = true
-				panic("deliberate")
-			},
-			context.Background(),
-			func(recovered any) string {
-				handlerRan = true
-				return fmt.Sprint(recovered)
-			},
-		)
-	}
-
-	panicInFinally()
-
-	writer.Flush()
-	b := buffer.Bytes()
-
-	if !finallyRan {
-		t.Fatalf("expected finally to have been invoked")
-	}
-
-	if handlerRan {
-		t.Fatalf("expected recovery handler not to have been invoked")
-	}
-
-	type Entry struct {
-		Time       string   `json:"time"`
-		Msg        string   `json:"msg"`
-		StackTrace string   `json:"stacktrace"`
-		Tags       []string `json:"tags"`
-	}
-
-	entry := Entry{}
-	err := json.Unmarshal(b, &entry)
-
-	if err != nil {
-		t.Fatalf("error unmarshaling entry: %v", err.Error())
-	}
-
-	if entry.Msg != "recovered: deliberate" {
-		t.Fatalf(
-			"expected msg to be 'recovered: deliberate', got '%s'",
-			entry.Msg)
-	}
-
-	if !slices.Contains[[]string](entry.Tags, "PANIC") {
-		t.Fatalf("expected %v to contain 'PANIC'", entry.Tags)
-	}
-
-	if !slices.Contains[[]string](entry.Tags, "FINALLY") {
-		t.Fatalf("expected %v to contain 'FINALLY'", entry.Tags)
-	}
-}
-
-func TestPanicInHandler(t *testing.T) {
-
-	buffer := bytes.Buffer{}
-	writer := bufio.NewWriter(&buffer)
-	logger := New(writer, nil)
-	finallyRan := false
-
-	panicInHandler := func() {
-		defer logger.Defer(
-			false,
-			func() {
-				finallyRan = true
-			},
-			func(recovered any) string {
-				panic("deliberate")
-			})
-		panic("trigger")
-	}
-
-	panicInHandler()
-
-	writer.Flush()
-	b := buffer.Bytes()
-
-	if !finallyRan {
-		t.Fatalf("expected finally to have been invoked")
-	}
-
-	type Entry struct {
-		Time       string   `json:"time"`
-		Msg        string   `json:"msg"`
-		StackTrace string   `json:"stacktrace"`
-		Tags       []string `json:"tags"`
-	}
-
-	entry := Entry{}
-	err := json.Unmarshal(b, &entry)
-
-	if err != nil {
-		t.Fatalf("error unmarshaling entry: %v", err.Error())
-	}
-
-	if entry.Msg != "recovered: deliberate" {
-		t.Fatalf(
-			"expected msg to be 'recovered: deliberate', got '%s'",
-			entry.Msg)
-	}
-
-	if !slices.Contains[[]string](entry.Tags, "PANIC") {
-		t.Fatalf("expected %v to contain 'PANIC'", entry.Tags)
-	}
-
-	if !slices.Contains[[]string](entry.Tags, "HANDLER") {
-		t.Fatalf("expected %v to contain 'HANDLER'", entry.Tags)
-	}
-}
-
-func TestPanicInHandlerContext(t *testing.T) {
-
-	buffer := bytes.Buffer{}
-	writer := bufio.NewWriter(&buffer)
-	logger := New(writer, nil)
-	finallyRan := false
-
-	panicInHandler := func() {
-		defer logger.DeferContext(
-			false,
-			func() {
-				finallyRan = true
-			},
-			context.Background(),
-			func(recovered any) string {
-				panic("deliberate")
-			})
-		panic("trigger")
-	}
-
-	panicInHandler()
-
-	writer.Flush()
-	b := buffer.Bytes()
-
-	if !finallyRan {
-		t.Fatalf("expected finally to have been invoked")
-	}
-
-	type Entry struct {
-		Time       string   `json:"time"`
-		Msg        string   `json:"msg"`
-		StackTrace string   `json:"stacktrace"`
-		Tags       []string `json:"tags"`
-	}
-
-	entry := Entry{}
-	err := json.Unmarshal(b, &entry)
-
-	if err != nil {
-		t.Fatalf("error unmarshaling entry: %v", err.Error())
-	}
-
-	if entry.Msg != "recovered: deliberate" {
-		t.Fatalf(
-			"expected msg to be 'recovered: deliberate', got '%s'",
-			entry.Msg)
-	}
-
-	if !slices.Contains[[]string](entry.Tags, "PANIC") {
-		t.Fatalf("expected %v to contain 'PANIC'", entry.Tags)
-	}
-
-	if !slices.Contains[[]string](entry.Tags, "HANDLER") {
-		t.Fatalf("expected %v to contain 'HANDLER'", entry.Tags)
 	}
 }
 

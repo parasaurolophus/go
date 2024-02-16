@@ -57,7 +57,7 @@ const (
 )
 
 var (
-	// Default context for logging from command-line applications and the like.
+	// Default context for logging from command-line applications.
 	defaultContext = context.Background()
 )
 
@@ -173,46 +173,7 @@ func (l *Logger) AlwaysContext(ctx context.Context, message MessageBuilder, attr
 
 // See documentation for Logger.DeferContext().
 func (l *Logger) Defer(panicAgain bool, finally Finally, recoverHandler RecoverHandler, attributes ...any) {
-
-	recovered := []any{}
-
-	defer func() {
-		if finally != nil {
-			defer func() {
-				if finallyPanic := recover(); finallyPanic != nil {
-					l.logPanic(finallyPanic, "PANIC", "FINALLY")
-					recovered = append(recovered, finallyPanic)
-				}
-			}()
-			finally()
-		}
-		n := len(recovered)
-		if panicAgain && n > 0 {
-			if n == 1 {
-				panic(recovered[0])
-			}
-			panic(recovered)
-		}
-	}()
-
-	if originalPanic := recover(); originalPanic != nil {
-
-		a := append(attributes, RECOVERED, originalPanic)
-		msg := fmt.Sprintf("recovered: %v", originalPanic)
-
-		if recoverHandler != nil {
-			defer func() {
-				if handlerPanic := recover(); handlerPanic != nil {
-					l.logPanic(handlerPanic, "PANIC", "HANDLER")
-					recovered = append(recovered, handlerPanic)
-				}
-			}()
-			msg = recoverHandler(originalPanic)
-		}
-
-		recovered = append(recovered, originalPanic)
-		l.Always(func() string { return msg }, a...)
-	}
+	l.finally(panicAgain, defaultContext, finally, recoverHandler, attributes...)
 }
 
 // For use with defer to log if a panic occurs.
@@ -260,45 +221,25 @@ func (l *Logger) Defer(panicAgain bool, finally Finally, recoverHandler RecoverH
 // builder functions cause an abnormal exit. [See the documentation for panic()
 // and recover() for more information.]
 func (l *Logger) DeferContext(panicAgain bool, finally Finally, ctx context.Context, recoverHandler RecoverHandler, attributes ...any) {
+	l.finally(panicAgain, ctx, finally, recoverHandler, attributes...)
+}
 
-	recovered := []any{}
-
+func (l *Logger) finally(panicAgain bool, ctx context.Context, finally Finally, recoverHandler RecoverHandler, attributes ...any) {
 	defer func() {
 		if finally != nil {
-			defer func() {
-				if finallyPanic := recover(); finallyPanic != nil {
-					l.logPanicContext(finallyPanic, ctx, "PANIC", "FINALLY")
-					recovered = append(recovered, finallyPanic)
-				}
-			}()
 			finally()
 		}
-		n := len(recovered)
-		if panicAgain && n > 0 {
-			if n == 1 {
-				panic(recovered[0])
-			}
-			panic(recovered)
-		}
 	}()
-
-	if originalPanic := recover(); originalPanic != nil {
-
-		a := append(attributes, RECOVERED, originalPanic, TAGS, "PANIC")
-		msg := fmt.Sprintf("recovered: %v", originalPanic)
-
-		if recoverHandler != nil {
-			defer func() {
-				if handlerPanic := recover(); handlerPanic != nil {
-					l.logPanicContext(handlerPanic, ctx, "PANIC", "HANDLER")
-					recovered = append(recovered, handlerPanic)
-				}
-			}()
-			msg = recoverHandler(originalPanic)
+	if r := recover(); r != nil {
+		a := append(attributes, RECOVERED, r)
+		if recoverHandler == nil {
+			l.AlwaysContext(ctx, nil, a...)
+		} else {
+			l.AlwaysContext(ctx, func() string { return recoverHandler(r) }, a...)
 		}
-
-		recovered = append(recovered, originalPanic)
-		l.AlwaysContext(ctx, func() string { return msg }, a...)
+		if panicAgain {
+			panic(r)
+		}
 	}
 }
 
@@ -525,22 +466,4 @@ func newAttrReplacer(oldReplacer func([]string, slog.Attr) slog.Attr) func([]str
 
 		return attr
 	}
-}
-
-func (l *Logger) logPanic(recovered any, tags ...string) {
-	attributes := append(
-		l.BaseAttributes(),
-		RECOVERED, recovered,
-		TAGS, append(l.BaseTags(), tags...),
-		STACKTRACE, stacktraces.ShortStackTrace(nil))
-	l.wrapped.Error(fmt.Sprintf("recovered: %v", recovered), attributes...)
-}
-
-func (l *Logger) logPanicContext(recovered any, ctx context.Context, tags ...string) {
-	attributes := append(
-		l.BaseAttributes(),
-		RECOVERED, recovered,
-		TAGS, append(l.BaseTags(), tags...),
-		STACKTRACE, stacktraces.ShortStackTrace(nil))
-	l.wrapped.ErrorContext(ctx, fmt.Sprintf("recovered: %v", recovered), attributes...)
 }
