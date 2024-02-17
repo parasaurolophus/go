@@ -15,7 +15,7 @@ var (
 	sent = 0
 	// The number of values received from the goroutine.
 	received = 0
-
+	// Logger configuration.
 	loggerOptions = logging.LoggerOptions{
 		BaseTags: []string{"EXAMPLE"},
 		BaseAttributes: []any{
@@ -23,7 +23,7 @@ var (
 			"received", &received,
 		},
 	}
-
+	// Logger.
 	logger = logging.New(os.Stdout, &loggerOptions)
 )
 
@@ -52,7 +52,6 @@ func main() {
 		},
 		logging.STACKTRACE, functionName,
 		logging.TAGS, []string{"PANIC", "SEVERE"})
-
 	ch := make(chan int)
 	logger.Trace(
 		func() string { return fmt.Sprintf("%s starting sender goroutine", functionName) },
