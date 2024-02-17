@@ -2,8 +2,8 @@ _Copyright &copy; Kirk Rader 2024_
 
 # Wrapper for `log/slog`
 
-Note: the primary source of documentation for this library is in the form of
-inline comments that can be viewed using `go doc`.
+The primary source of documentation for this library is in the form of inline
+comments that can be viewed using `go doc`.
 
 ```
 $ go doc -all
@@ -13,15 +13,12 @@ package logging // import "parasaurolophus/go/logging"
 CONSTANTS
 
 const (
-
 	// Logger.Defer() and Logger.DeferContext() will include the value returned
 	// by recover() when logging a panic.
 	RECOVERED = "recovered"
-
 	// Values of "stacktrace" attributes will be replaced with one-line stack
 	// traces for the function that called the given logging method.
 	STACKTRACE = "stacktrace"
-
 	// Value will be merged with the currently configured
 	// LoggerOptions.BaseTags.
 	TAGS = "tags"
@@ -137,10 +134,18 @@ func (l *Logger) BaseAttributes() []any
 func (l *Logger) BaseTags() []string
     Return the current base tags.
 
-func (l *Logger) Defer(panicAgain bool, finally Finally, recoverHandler RecoverHandler, attributes ...any)
+func (l *Logger) Enabled(verbosity Verbosity) bool
+    Return true or false depending on whether or not the given verbosity is
+    currently enabled for the given logger.
+
+func (l *Logger) EnabledContext(ctx context.Context, verbosity Verbosity) bool
+    Return true or false depending on whether or not the given verbosity is
+    currently enabled for the given logger.
+
+func (l *Logger) Finally(panicAgain bool, finally Finally, recoverHandler RecoverHandler, attributes ...any)
     See documentation for Logger.DeferContext().
 
-func (l *Logger) DeferContext(panicAgain bool, finally Finally, ctx context.Context, recoverHandler RecoverHandler, attributes ...any)
+func (l *Logger) FinallyContext(panicAgain bool, finally Finally, ctx context.Context, recoverHandler RecoverHandler, attributes ...any)
     For use with defer to log if a panic occurs.
 
     If recover() returns non-nil, its value will be passed to handler.
@@ -156,7 +161,7 @@ func (l *Logger) DeferContext(panicAgain bool, finally Finally, ctx context.Cont
     channel named ch:
 
         name := stacktraces.FunctionName()
-        defer logger.DeferContext(
+        defer logger.FinallyContext(
 
             // don't cause process to exit abnormally even if a panic occurs
             false,
@@ -185,14 +190,6 @@ func (l *Logger) DeferContext(panicAgain bool, finally Finally, ctx context.Cont
     panicAgain is also used to determine whether or not panics in the clean-up
     or message builder functions cause an abnormal exit. [See the documentation
     for panic() and recover() for more information.]
-
-func (l *Logger) Enabled(verbosity Verbosity) bool
-    Return true or false depending on whether or not the given verbosity is
-    currently enabled for the given logger.
-
-func (l *Logger) EnabledContext(ctx context.Context, verbosity Verbosity) bool
-    Return true or false depending on whether or not the given verbosity is
-    currently enabled for the given logger.
 
 func (l *Logger) Fine(message MessageBuilder, attributes ...any)
     Log at FINE verbosity.
@@ -302,7 +299,7 @@ slogger.Error("...")
 
 The value of any attribute named "stacktrace" (`logging.STACKTRACE`) will be
 replaced by a one-line stack trace that starts at the frame for the function
-invoked the given logging method, e.g.:
+invoked by the given logging method, e.g.:
 
 ```go
 // include stack traces in log entries
@@ -372,9 +369,15 @@ func main() {
 will emit a log entry like:
 
 ```json
-{"time":"2024-02-11T06:51:51.00758035-06:00","verbosity":"OPTIONAL","msg":"n = 42","counters":{"error1":1,"error2":0},"baz":"waka","stacktrace":"5:main.main [/source/go/scratch/scratch.go:29] < 6:runtime.main [/usr/local/go/src/runtime/proc.go:267] < 7:runtime.goexit [/usr/local/go/src/runtime/asm_arm64.s:1197]","tags":["foo","bar","hoo"]}
+{"time":"2024-02-17T11:09:26.656637348-06:00","verbosity":"OPTIONAL","msg":"n = 42","counters":{"error1":1,"error2":0},"baz":"waka","stacktrace":"5:main.main [/source/go/scratch/scratch.go:29] < 6:runtime.main [/usr/local/go/src/runtime/proc.go:271] < 7:runtime.goexit [/usr/local/go/src/runtime/asm_arm64.s:1222]","tags":["foo","bar","hoo"]}
 ```
 
 See [../example/example.go](../example/example.go) for a more complete set of
 examples, including how to ensure that panics are logged with stack traces using
-`logging.Logger.Defer().
+`logging.Logger.Finally()`.
+
+Also see [../stacktraces/README.md](../stacktraces/README.md) for information on
+the support for stack traces on which this library depends, including how the
+value of `logging.STACKTRACE` attributes are interpreted. Generally, the value
+of any `logging.STACKTRACE` attribute is replaced by passing its value to
+`stacktraces.ShortStackTrace()` [q.v.] when the logging method is executed.

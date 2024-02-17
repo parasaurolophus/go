@@ -11,7 +11,6 @@ import (
 )
 
 type (
-
 	// Type of function passed to logging methods for lazy evaluation of message
 	// formatting.
 	//
@@ -20,40 +19,19 @@ type (
 	// Such a function is invoked only if a given verbosity is enabled for a
 	// given logger.
 	MessageBuilder func() string
-
 	// Type of function passed as first argument to Logger.Defer() and
 	// Logger.DeferContext().
 	Finally func()
-
 	// Type of function passed to Logger.Defer() and Logger.DeferContext() to
 	// allow for including the value returned by recover() in the log entry.
 	RecoverHandler func(recovered any) string
-
 	// Wrapper for an instance of slog.Logger.
 	Logger struct {
-
 		// This logger's configuration.
 		options LoggerOptions
-
 		// The wrapped slog.Logger.
 		wrapped *slog.Logger
 	}
-)
-
-// Specially handled attributes.
-const (
-
-	// Logger.Defer() and Logger.DeferContext() will include the value returned
-	// by recover() when logging a panic.
-	RECOVERED = "recovered"
-
-	// Values of "stacktrace" attributes will be replaced with one-line stack
-	// traces for the function that called the given logging method.
-	STACKTRACE = "stacktrace"
-
-	// Value will be merged with the currently configured
-	// LoggerOptions.BaseTags.
-	TAGS = "tags"
 )
 
 var (
@@ -110,24 +88,18 @@ var (
 // each log entry should include the current value for that attribute rather
 // than a copy of the value at the time the Logger was created.
 func New(writer io.Writer, options *LoggerOptions) *Logger {
-
 	logger := new(Logger)
-
 	if options != nil {
 		logger.options = *options
 	}
-
 	if logger.options.Level == nil {
 		logger.options.Level = new(slog.LevelVar)
 	}
-
 	handlerOptions := new(slog.HandlerOptions)
 	handlerOptions.AddSource = logger.options.AddSource
 	handlerOptions.Level = logger.options.Level
 	handlerOptions.ReplaceAttr = newAttrReplacer(logger.options.ReplaceAttr)
-
 	logger.wrapped = slog.New(slog.NewJSONHandler(writer, handlerOptions))
-
 	return logger
 }
 
@@ -172,8 +144,8 @@ func (l *Logger) AlwaysContext(ctx context.Context, message MessageBuilder, attr
 }
 
 // See documentation for Logger.DeferContext().
-func (l *Logger) Defer(panicAgain bool, finally Finally, recoverHandler RecoverHandler, attributes ...any) {
-	l.finally(panicAgain, defaultContext, finally, recoverHandler, attributes...)
+func (l *Logger) Finally(panicAgain bool, finally Finally, recoverHandler RecoverHandler, attributes ...any) {
+	l.finallyCommon(panicAgain, defaultContext, finally, recoverHandler, attributes...)
 }
 
 // For use with defer to log if a panic occurs.
@@ -191,7 +163,7 @@ func (l *Logger) Defer(panicAgain bool, finally Finally, recoverHandler RecoverH
 // channel named ch:
 //
 //	name := stacktraces.FunctionName()
-//	defer logger.DeferContext(
+//	defer logger.FinallyContext(
 //
 //	    // don't cause process to exit abnormally even if a panic occurs
 //	    false,
@@ -220,27 +192,8 @@ func (l *Logger) Defer(panicAgain bool, finally Finally, recoverHandler RecoverH
 // also used to determine whether or not panics in the clean-up or message
 // builder functions cause an abnormal exit. [See the documentation for panic()
 // and recover() for more information.]
-func (l *Logger) DeferContext(panicAgain bool, finally Finally, ctx context.Context, recoverHandler RecoverHandler, attributes ...any) {
-	l.finally(panicAgain, ctx, finally, recoverHandler, attributes...)
-}
-
-func (l *Logger) finally(panicAgain bool, ctx context.Context, finally Finally, recoverHandler RecoverHandler, attributes ...any) {
-	defer func() {
-		if finally != nil {
-			finally()
-		}
-	}()
-	if r := recover(); r != nil {
-		a := append(attributes, RECOVERED, r)
-		if recoverHandler == nil {
-			l.AlwaysContext(ctx, nil, a...)
-		} else {
-			l.AlwaysContext(ctx, func() string { return recoverHandler(r) }, a...)
-		}
-		if panicAgain {
-			panic(r)
-		}
-	}
+func (l *Logger) FinallyContext(panicAgain bool, finally Finally, ctx context.Context, recoverHandler RecoverHandler, attributes ...any) {
+	l.finallyCommon(panicAgain, ctx, finally, recoverHandler, attributes...)
 }
 
 // Return true or false depending on whether or not the given verbosity is
@@ -292,16 +245,12 @@ func (l *Logger) SetContext(ctx context.Context) {
 
 // Implement lazy evaluation of all log entry formatting code.
 func (l *Logger) log(ctx context.Context, verbosity Verbosity, message MessageBuilder, attributes ...any) {
-
 	if l.wrapped.Enabled(ctx, slog.Level(verbosity)) {
-
 		msg := ""
-
 		if message != nil {
-			defer l.DeferContext(l.options.AllowPanics, nil, ctx, nil)
+			defer l.FinallyContext(l.options.AllowPanics, nil, ctx, nil)
 			msg = message()
 		}
-
 		attribs := []any{}
 		combined := append(l.options.BaseAttributes, attributes...)
 		includeStackTrace := false
@@ -309,41 +258,31 @@ func (l *Logger) log(ctx context.Context, verbosity Verbosity, message MessageBu
 		tags := l.options.BaseTags
 		n := len(combined)
 		var max int
-
 		if n%2 == 0 {
 			max = n - 1
 		} else {
 			max = n - 2
 		}
-
 		for index, attrib := range combined {
-
 			if index < max && index%2 == 0 {
-
 				switch attrib {
-
 				case TAGS:
 					tags = appendTag(tags, combined[index+1])
 
 				case STACKTRACE:
-					stackTraceValue, includeStackTrace = convertSkipFrames(combined[index+1])
-
+					stackTraceValue = convertSkipFrames(combined[index+1])
+					includeStackTrace = true
 				default:
 					attribs = appendAttribute(attribs, attrib, combined[index+1])
 				}
 			}
 		}
-
 		if includeStackTrace {
-
 			attribs = append(attribs, STACKTRACE, stacktraces.ShortStackTrace(stackTraceValue))
 		}
-
 		if len(tags) > 0 {
-
 			attribs = append(attribs, TAGS, tags)
 		}
-
 		l.wrapped.Log(ctx, slog.Level(verbosity), msg, attribs...)
 	}
 }
@@ -354,12 +293,9 @@ func (l *Logger) log(ctx context.Context, verbosity Verbosity, message MessageBu
 // Simply returns the given attributes list without appending anything if key is
 // not a string.
 func appendAttribute(attributes []any, key any, val any) []any {
-
 	switch k := key.(type) {
-
 	case string:
 		return append(attributes, k, val)
-
 	default:
 		return attributes
 	}
@@ -372,42 +308,35 @@ func appendAttribute(attributes []any, key any, val any) []any {
 // elements in a slice of strings will be appended. A single string will be
 // appended. Any other type will be converted to a string and appended.
 func appendTag(tags []string, tag any) []string {
-
 	switch v := tag.(type) {
-
 	case []string:
 		return append(tags, v...)
-
 	case string:
 		return append(tags, v)
-
 	case fmt.Stringer:
 		return append(tags, v.String())
-
 	default:
 		return append(tags, fmt.Sprintf("%v", v))
 	}
 }
 
-// Return the value to use as the skipFrames parameter for the value of a given
-// "stacktrace" attribute.
-//
-// This treats nil specially, so that it will have a similar effect to passing
-// nil to stacktraces.ShortStackTrace().
-func convertSkipFrames(val any) (any, bool) {
-
-	// treat nil specially so as to allow for explicitly passing
-	// int and string parameters in special circumstances such
-	// as Defer
-
-	switch v := val.(type) {
-	case nil:
-		// the number of frames to skip here is empirically
-		// derived and may change if this library is refactored
-		return 5, true
-
-	default:
-		return v, true
+// Common implementation used by Logger.Finally() and Logger.FinallyContext()
+func (l *Logger) finallyCommon(panicAgain bool, ctx context.Context, finally Finally, recoverHandler RecoverHandler, attributes ...any) {
+	defer func() {
+		if finally != nil {
+			finally()
+		}
+	}()
+	if r := recover(); r != nil {
+		a := append(attributes, RECOVERED, r, STACKTRACE, -3)
+		if recoverHandler == nil {
+			l.AlwaysContext(ctx, nil, a...)
+		} else {
+			l.AlwaysContext(ctx, func() string { return recoverHandler(r) }, a...)
+		}
+		if panicAgain {
+			panic(r)
+		}
 	}
 }
 
@@ -418,44 +347,34 @@ func convertSkipFrames(val any) (any, bool) {
 //   - Replace "level" with "verbosity" whose value is the name of the
 //     corresponding Verbosity const ("TRACE", "FINE", "OPTIONAL" or "ALWAYS").
 func newAttrReplacer(oldReplacer func([]string, slog.Attr) slog.Attr) func([]string, slog.Attr) slog.Attr {
-
 	return func(groups []string, attr slog.Attr) slog.Attr {
-
 		if oldReplacer != nil {
 			attr = oldReplacer(groups, attr)
 		}
-
 		if attr.Key == "level" {
-
 			const verbosityKey = "verbosity"
 			val := attr.Value.String()
-
 			switch val {
-
 			case slog.LevelDebug.String():
 				return slog.Attr{
 					Key:   verbosityKey,
 					Value: slog.StringValue(TRACE.String()),
 				}
-
 			case slog.LevelInfo.String():
 				return slog.Attr{
 					Key:   verbosityKey,
 					Value: slog.StringValue(FINE.String()),
 				}
-
 			case slog.LevelWarn.String():
 				return slog.Attr{
 					Key:   verbosityKey,
 					Value: slog.StringValue(OPTIONAL.String()),
 				}
-
 			case slog.LevelError.String():
 				return slog.Attr{
 					Key:   verbosityKey,
 					Value: slog.StringValue(ALWAYS.String()),
 				}
-
 			default:
 				return slog.Attr{
 					Key:   verbosityKey,
@@ -463,7 +382,25 @@ func newAttrReplacer(oldReplacer func([]string, slog.Attr) slog.Attr) func([]str
 				}
 			}
 		}
-
 		return attr
+	}
+}
+
+// Return the value to use as the skipFrames parameter for the value of a given
+// "stacktrace" attribute.
+func convertSkipFrames(val any) any {
+	// the number of frames to skip here is empirically
+	// derived and may change if this library is refactored
+	const defaultSkip = 5
+	switch v := val.(type) {
+	case int:
+		if v < 0 {
+			return defaultSkip - v
+		}
+		return v
+	case string:
+		return v
+	default:
+		return defaultSkip
 	}
 }

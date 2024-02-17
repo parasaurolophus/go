@@ -33,6 +33,7 @@ var (
 // argument.
 func main() {
 	verbosity := logging.OPTIONAL
+	logger.SetVerbosity(verbosity)
 	panicInMain := false
 	panicAgain := true
 	parseArg(1, "logging.Verbosity", &verbosity)
@@ -41,7 +42,7 @@ func main() {
 	fmt.Printf("\nverbosity: %s, panicInMain: %v, panicAgain: %v\n\n", verbosity, panicInMain, panicAgain)
 	logger.SetVerbosity(verbosity)
 	functionName := stacktraces.FunctionName()
-	defer logger.Defer(
+	defer logger.Finally(
 		panicAgain,
 		func() {
 			logger.Optional(nil, logging.TAGS, "DEBUG")
@@ -77,7 +78,7 @@ func main() {
 // logging.Logger.Defer().
 func sender(ch chan int) {
 	functionName := stacktraces.FunctionName()
-	defer logger.Defer(
+	defer logger.Finally(
 		false,
 		func() {
 			logger.Trace(func() string { return fmt.Sprintf("%s goroutine closing channel", functionName) })
