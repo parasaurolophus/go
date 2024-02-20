@@ -10,7 +10,6 @@ import (
 )
 
 type (
-
 	// Error objects that contain the current call stack at the time they were
 	// created.
 	//
@@ -31,7 +30,6 @@ type (
 )
 
 const (
-
 	// Capacity of address buffer passed to runtime.Callers().
 	maxDepth = 1024
 	// The default number of frames to skip when skipFrames is neither a string

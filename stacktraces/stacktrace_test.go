@@ -36,11 +36,9 @@ func TestStackTrace(t *testing.T) {
 		if actual != "runtime.Callers" {
 			t.Fatalf("expected first frame to be 'runtime.Callers', got '%s'", actual)
 		}
-
 	default:
 		t.Fatalf("expected err to be a StackTrace")
 	}
-
 	msg := err.Error()
 	if msg != "test" {
 		t.Fatalf(

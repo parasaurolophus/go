@@ -9,7 +9,6 @@ import (
 // Return the name of the function that called this one, i.e. the currently
 // executing function from that function's point of view.
 func FunctionName() string {
-
 	_, name, _, _, _ := functionInfo(nil)
 	return name
 }
@@ -59,7 +58,6 @@ func functionInfo(skipFrames any) (int, string, string, int, bool) {
 	pc = pc[:n]
 	frames := runtime.CallersFrames(pc)
 	count := skip
-
 	for {
 		frame, more := frames.Next()
 		if frameTest(&frame) {
