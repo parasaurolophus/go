@@ -10,6 +10,7 @@ import (
 )
 
 type (
+
 	// Error objects that contain the current call stack at the time they were
 	// created.
 	//
@@ -23,15 +24,19 @@ type (
 		// One-line stack trace returned by StackTrace.ShortTrace().
 		shortTrace string
 	}
+
 	// Type of function used to write a single frame to a stack trace.
 	stackFrameFormatter func(writer *bufio.Writer, frameNumber int, frame *runtime.Frame)
+
 	// Type of function used to test a frame for inclusion in a stack trace.
 	stackFrameTest func(frame *runtime.Frame) bool
 )
 
 const (
+
 	// Capacity of address buffer passed to runtime.Callers().
 	maxDepth = 1024
+
 	// The default number of frames to skip when skipFrames is neither a string
 	// nor a positive int.
 	//
@@ -90,9 +95,11 @@ func ShortStackTrace(skipFrames any) string {
 // when passing a positive int or no matching frame is found when passing a
 // string.
 func New(msg string, skipFrames any) StackTrace {
+
 	longFormatter := longFrameFormatter()
 	shortFormatter := shortFrameFormatter()
 	long, short := formatStackTrace(skipFrames, longFormatter, shortFormatter)
+
 	return StackTrace{
 		msg:        msg,
 		longTrace:  long,
@@ -117,13 +124,17 @@ func (t StackTrace) ShortTrace() string {
 
 // Return a function which writes a multi-line representation of a stack frame.
 func longFrameFormatter() stackFrameFormatter {
+
 	writeSeparator := false
+
 	return func(writer *bufio.Writer, frameNumber int, frame *runtime.Frame) {
+
 		if writeSeparator {
 			writer.WriteString("---\n")
 		} else {
 			writeSeparator = true
 		}
+
 		writer.WriteString(
 			fmt.Sprintf(
 				"%d:%s\n%s:%d\n%#v\n",
@@ -137,13 +148,17 @@ func longFrameFormatter() stackFrameFormatter {
 
 // Return a function which writes a one-line representation of a stack frame.
 func shortFrameFormatter() stackFrameFormatter {
+
 	writeSeparator := false
+
 	return func(writer *bufio.Writer, frameNumber int, frame *runtime.Frame) {
+
 		if writeSeparator {
 			writer.WriteString(" < ")
 		} else {
 			writeSeparator = true
 		}
+
 		writer.WriteString(
 			fmt.Sprintf(
 				"%d:%s [%s:%d]",
@@ -160,18 +175,23 @@ func shortFrameFormatter() stackFrameFormatter {
 // Returns multi-line and one-line string representations of the current call
 // stack.
 func formatStackTrace(skipFrames any, longFormatter stackFrameFormatter, shortFormatter stackFrameFormatter) (string, string) {
+
 	// in-memory writers in which the stack trace strings will be built
 	longBuffer := bytes.Buffer{}
 	longWriter := bufio.NewWriter(&longBuffer)
 	shortBuffer := bytes.Buffer{}
 	shortWriter := bufio.NewWriter(&shortBuffer)
+
 	// the number that will be passed to runtime.Callers()
 	skip := 0
+
 	// default frame test unconditionally returns true on the assumption that
 	// skip will be a non-negative int
 	frameTest := func(*runtime.Frame) bool { return true }
+
 	// adjust skip and frameTest according to the supplied value of skipFrames
 	switch v := skipFrames.(type) {
+
 	case int:
 		if v < 0 {
 			// skip past this function's caller's caller when skipFrames is
@@ -182,18 +202,22 @@ func formatStackTrace(skipFrames any, longFormatter stackFrameFormatter, shortFo
 			// non-negative
 			skip = v
 		}
+
 	case string:
 		// use a frameTest that skips all frames until a given function is seen
 		frameTest = skipUntil(v)
+
 	default:
 		// skip past this function's caller's caller when skipFrames is any
 		// other value
 		skip = defaultSkip
 	}
+
 	// capture the current call stack's addresses using (what is to be hoped) a
 	// sufficient size of address buffer
 	pc := make([]uintptr, maxDepth)
 	n := runtime.Callers(skip, pc)
+
 	// when stack depth was not exceeded...
 	if n > 0 {
 		// ...iterate over the captured call stack's frames, applying the
@@ -201,24 +225,33 @@ func formatStackTrace(skipFrames any, longFormatter stackFrameFormatter, shortFo
 		pc = pc[:n]
 		frames := runtime.CallersFrames(pc)
 		frameNumber := skip
+
 		for {
+
 			frame, more := frames.Next()
+
 			if frameTest(&frame) {
+
 				if longFormatter != nil {
 					longFormatter(longWriter, frameNumber, &frame)
 				}
+
 				if shortFormatter != nil {
 					shortFormatter(shortWriter, frameNumber, &frame)
 				}
 			}
+
 			frameNumber += 1
+
 			if !more {
 				break
 			}
 		}
 	}
+
 	longWriter.Flush()
 	shortWriter.Flush()
+
 	return longBuffer.String(), shortBuffer.String()
 }
 
@@ -228,7 +261,9 @@ func formatStackTrace(skipFrames any, longFormatter stackFrameFormatter, shortFo
 // The returned function will be the frame test used by formatStackTrace() when
 // skipFrames is a string
 func skipUntil(startWhen string) stackFrameTest {
+
 	seen := false
+
 	return func(frame *runtime.Frame) bool {
 		seen = seen || startWhen == frame.Function
 		return seen

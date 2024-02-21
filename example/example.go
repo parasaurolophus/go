@@ -11,10 +11,13 @@ import (
 )
 
 var (
+
 	// The number of values sent by a goroutine.
 	sent = 0
+
 	// The number of values received from the goroutine.
 	received = 0
+
 	// Logger configuration.
 	loggerOptions = logging.LoggerOptions{
 		BaseTags: []string{"EXAMPLE"},
@@ -23,6 +26,7 @@ var (
 			"received", &received,
 		},
 	}
+
 	// Logger.
 	logger = logging.New(os.Stdout, &loggerOptions)
 )
@@ -32,19 +36,18 @@ var (
 // Logging verbosity defaults to OPTIONAL but may be set using a command-line
 // argument.
 func main() {
-	verbosity := logging.OPTIONAL
-	logger.SetVerbosity(verbosity)
+
+	functionName := stacktraces.FunctionName()
+	verbosity := logger.Verbosity()
 	panicInMain := false
 	panicAgain := true
-	parseArg(1, "logging.Verbosity", &verbosity)
-	parseArg(2, "bool", &panicInMain)
-	parseArg(3, "bool", &panicAgain)
-	fmt.Printf("\nverbosity: %s, panicInMain: %v, panicAgain: %v\n\n", verbosity, panicInMain, panicAgain)
-	logger.SetVerbosity(verbosity)
-	functionName := stacktraces.FunctionName()
+	argv := os.Args
+	argc := len(argv)
+
 	defer logger.Finally(
 		panicAgain,
 		func() {
+			defer func() { fmt.Println() }()
 			logger.Optional(nil, logging.TAGS, "DEBUG")
 		},
 		func(r any) string {
@@ -52,22 +55,35 @@ func main() {
 		},
 		logging.STACKTRACE, functionName,
 		logging.TAGS, []string{"PANIC", "SEVERE"})
+
+	parseArg(argv, argc, 1, "logging.Verbosity", &verbosity)
+	logger.SetVerbosity(verbosity)
+	parseArg(argv, argc, 2, "bool", &panicInMain)
+	parseArg(argv, argc, 3, "bool", &panicAgain)
+	fmt.Printf("\nverbosity: %s, panicInMain: %v, panicAgain: %v\n\n", verbosity, panicInMain, panicAgain)
+
 	ch := make(chan int)
 	logger.Trace(
 		func() string { return fmt.Sprintf("%s starting sender goroutine", functionName) },
 		logging.TAGS, "DEBUG")
+
 	go sender(ch)
+
 	logger.Trace(
 		func() string { return fmt.Sprintf("%s consuming output from sender goroutine", functionName) },
 		logging.TAGS, "DEBUG")
+
 	for v := range ch {
 		received += 1
 		logger.Fine(func() string { return strconv.Itoa(v) })
 	}
+
 	fmt.Printf("\n%d sent, %d received\n\n", sent, received)
+
 	if panicInMain {
 		panic("another deliberate panic")
 	}
+
 	logger.Trace(func() string { return fmt.Sprintf("%s exiting normally", functionName) })
 }
 
@@ -76,7 +92,9 @@ func main() {
 // This deliberately panics after sending a few values as a demonstration of
 // logging.Logger.Defer().
 func sender(ch chan int) {
+
 	functionName := stacktraces.FunctionName()
+
 	defer logger.Finally(
 		false,
 		func() {
@@ -87,8 +105,8 @@ func sender(ch chan int) {
 			return fmt.Sprintf("%s recovered from: %v", functionName, recovered)
 		},
 		logging.STACKTRACE, functionName,
-		logging.TAGS, []string{"PANIC", "MEDIUM"},
-	)
+		logging.TAGS, []string{"PANIC", "MEDIUM"})
+
 	for v := 0; v < 10; v++ {
 		if v > 4 {
 			logger.Trace(func() string { return "sender deliberately causing a panic" })
@@ -99,30 +117,37 @@ func sender(ch chan int) {
 	}
 }
 
-func parseArg(index int, typeName string, val any) {
-	if len(os.Args) <= index {
+// Parse an optional argument if it was supplied
+func parseArg(argv []string, argc int, index int, typeName string, val any) {
+
+	if argc <= index {
 		logger.Fine(
 			func() string { return fmt.Sprintf("optional argument %d (of type %s) not supplied", index, typeName) },
 			logging.TAGS, "DEBUG")
 		return
 	}
-	n, err := fmt.Sscan(os.Args[index], val)
+
+	n, err := fmt.Sscan(argv[index], val)
+
 	if err != nil {
 		logger.Optional(
 			func() string { return err.Error() },
 			logging.STACKTRACE, nil,
 			logging.TAGS, []string{"ERROR", "USER", "BAD_ARGS"},
 		)
-		os.Exit(1)
+		panic(fmt.Sprintf("BAD_ARG_%02d", index))
 	}
+
 	if n != 1 {
+		msg := fmt.Sprintf("expected 1 %s, got %d", typeName, n)
 		logger.Optional(
-			func() string { return fmt.Sprintf("expected 1 %s, got %d", typeName, n) },
+			func() string { return msg },
 			logging.STACKTRACE, nil,
 			logging.TAGS, []string{"ERROR", "USER", "BAD_ARGS"},
 		)
-		os.Exit(1)
+		panic(fmt.Sprintf("BAD_ARG_%02d", index))
 	}
+
 	logger.Trace(
 		func() string { return fmt.Sprintf("parsed arg %d: %v", index, val) },
 		logging.TAGS, "DEBUG")

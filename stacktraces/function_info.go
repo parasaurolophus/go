@@ -34,38 +34,51 @@ func FunctionInfo(skipFrames any) (int, string, string, int, bool) {
 
 // Common implementation for FunctionName() and FunctionInfo()
 func functionInfo(skipFrames any) (int, string, string, int, bool) {
+
 	var (
 		skip                     = 0
 		frameTest stackFrameTest = func(frame *runtime.Frame) bool { return true }
 	)
+
 	switch v := skipFrames.(type) {
+
 	case int:
 		if v < 0 {
 			skip = defaultSkip - v
 		} else {
 			skip = v
 		}
+
 	case string:
 		frameTest = skipUntil(v)
+
 	default:
 		skip = defaultSkip
 	}
+
 	pc := make([]uintptr, maxDepth)
 	n := runtime.Callers(skip, pc)
+
 	if n < 1 {
 		return 0, "", "", 0, false
 	}
+
 	pc = pc[:n]
 	frames := runtime.CallersFrames(pc)
 	count := skip
+
 	for {
+
 		frame, more := frames.Next()
+
 		if frameTest(&frame) {
 			return count, frame.Function, frame.File, frame.Line, true
 		}
+
 		if !more {
 			return 0, "", "", 0, false
 		}
+
 		count += 1
 	}
 }
