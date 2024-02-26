@@ -196,7 +196,7 @@ func formatStackTrace(skipFrames any, longFormatter stackFrameFormatter, shortFo
 		if v < 0 {
 			// skip past this function's caller's caller when skipFrames is
 			// negative
-			skip = defaultSkip
+			skip = defaultSkip - v
 		} else {
 			// skip the specified number of frames when skipFrames is
 			// non-negative

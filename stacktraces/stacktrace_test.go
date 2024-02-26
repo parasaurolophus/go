@@ -163,8 +163,12 @@ func TestStackTraceFloat(t *testing.T) {
 }
 
 func TestStackTraceAuto(t *testing.T) {
-	functionName := FunctionName()
-	trace := New("test", -1)
+
+	_, functionName, _, _, ok := FunctionInfo(-2)
+	if !ok {
+		t.Fatalf("FunctionInfo(-2) returned false")
+	}
+	trace := New("test", -2)
 	long := trace.LongTrace()
 	short := trace.ShortTrace()
 	firstLong, m, err := stacktraces_test.FirstFunctionLong(long)
@@ -190,7 +194,7 @@ func TestStackTraceAuto(t *testing.T) {
 }
 
 func TestLongStackTraceAuto(t *testing.T) {
-	functionName := FunctionName()
+	_, functionName, _, _, _ := FunctionInfo(-1)
 	trace := LongStackTrace(-1)
 	name, n, err := stacktraces_test.FirstFunctionLong(trace)
 	if err != nil {
