@@ -443,204 +443,6 @@ func TestAlwaysContext(t *testing.T) {
 	}
 }
 
-func TestFinallyHandler(t *testing.T) {
-	buffer := bytes.Buffer{}
-	writer := bufio.NewWriter(&buffer)
-	logger := New(writer, nil)
-	finallyRan := false
-	expectedName := ""
-	panicWithFinally := func() {
-		expectedName = stacktraces.FunctionName()
-		defer logger.Finally(
-			false,
-			func() {
-				finallyRan = true
-			},
-			func(recovered any) string {
-				return fmt.Sprint(recovered)
-			})
-		panic("deliberate")
-	}
-	panicWithFinally()
-	writer.Flush()
-	b := buffer.Bytes()
-	if !finallyRan {
-		t.Fatalf("expected finally to have been invoked")
-	}
-	type Entry struct {
-		Time       string `json:"time"`
-		Verbosity  string `json:"verbosity"`
-		Msg        string `json:"msg"`
-		StackTrace string `json:"stacktrace"`
-		Recovered  string `json:"recovered"`
-	}
-	entry := Entry{}
-	err := json.Unmarshal(b, &entry)
-	if err != nil {
-		t.Fatalf("error unmarshaling log entry: %s", err.Error())
-	}
-	if entry.Msg != "deliberate" {
-		t.Fatalf("expected msg to be 'deliberate', got '%s'", entry.Msg)
-	}
-	if entry.Recovered != "deliberate" {
-		t.Fatalf("expected recovered to be 'deliberate', got '%s'", entry.Recovered)
-	}
-	actualName, _, err := stacktraces_test.FirstFunctionShort(entry.StackTrace)
-	if err != nil {
-		t.Fatalf("error parsing stack trace: %s", err.Error())
-	}
-	if actualName != expectedName {
-		t.Fatalf("expected stack trace to start with '%s', got '%s'", expectedName, actualName)
-	}
-}
-
-func TestFinallyContextHandler(t *testing.T) {
-	buffer := bytes.Buffer{}
-	writer := bufio.NewWriter(&buffer)
-	logger := New(writer, nil)
-	finallyRan := false
-	expectedName := ""
-	panicWithFinally := func() {
-		expectedName = stacktraces.FunctionName()
-		defer logger.FinallyContext(
-			false,
-			func() { finallyRan = true },
-			context.Background(),
-			func(recovered any) string { return fmt.Sprint(recovered) },
-			STACKTRACE, expectedName)
-		panic("deliberate")
-	}
-	panicWithFinally()
-	writer.Flush()
-	b := buffer.Bytes()
-	if !finallyRan {
-		t.Fatalf("expected 'finally' to have been execcuted")
-	}
-	type Entry struct {
-		Time       string `json:"time"`
-		Verbosity  string `json:"verbosity"`
-		Msg        string `json:"msg"`
-		StackTrace string `json:"stacktrace"`
-		Recovered  string `json:"recovered"`
-	}
-	entry := Entry{}
-	err := json.Unmarshal(b, &entry)
-	if err != nil {
-		t.Fatalf("error unmarshaling log entry: %s", err.Error())
-	}
-	if entry.Msg != "deliberate" {
-		t.Fatalf("expected msg to be 'deliberate', got '%s'", entry.Msg)
-	}
-	if entry.Recovered != "deliberate" {
-		t.Fatalf("expected recovered to be 'deliberate', got '%s'", entry.Recovered)
-	}
-	name, _, err := stacktraces_test.FirstFunctionShort(entry.StackTrace)
-	if err != nil {
-		t.Fatalf("error parsing stack trace: %s", err.Error())
-	}
-	if name != expectedName {
-		t.Fatalf("expected stack trace to start with '%s', got '%s'", expectedName, name)
-	}
-}
-
-func TestFinallyNilHandler(t *testing.T) {
-	buffer := bytes.Buffer{}
-	writer := bufio.NewWriter(&buffer)
-	logger := New(writer, nil)
-	finallyRan := false
-	expectedName := ""
-	panicWithFinally := func() {
-		expectedName = stacktraces.FunctionName()
-		defer logger.Finally(
-			false,
-			func() {
-				finallyRan = true
-			},
-			nil,
-			STACKTRACE, expectedName)
-		panic("deliberate")
-	}
-	panicWithFinally()
-	writer.Flush()
-	b := buffer.Bytes()
-	if !finallyRan {
-		t.Fatalf("expected finally to have been invoked")
-	}
-	type Entry struct {
-		Time       string `json:"time"`
-		Verbosity  string `json:"verbosity"`
-		Msg        string `json:"msg"`
-		StackTrace string `json:"stacktrace"`
-		Recovered  string `json:"recovered"`
-	}
-	entry := Entry{}
-	err := json.Unmarshal(b, &entry)
-	if err != nil {
-		t.Fatalf("error unmarshaling log entry: %s", err.Error())
-	}
-	if entry.Msg != "" {
-		t.Fatalf("expected msg to be empty, got '%s'", entry.Msg)
-	}
-	if entry.Recovered != "deliberate" {
-		t.Fatalf("expected recovered to be 'deliberate', got '%s'", entry.Recovered)
-	}
-	name, _, err := stacktraces_test.FirstFunctionShort(entry.StackTrace)
-	if err != nil {
-		t.Fatalf("error parsing stack trace: %s", err.Error())
-	}
-	if name != expectedName {
-		t.Fatalf("expected stack trace to start with '%s', got '%s'", expectedName, name)
-	}
-}
-
-func TestFinallyContextNilHandler(t *testing.T) {
-	buffer := bytes.Buffer{}
-	writer := bufio.NewWriter(&buffer)
-	logger := New(writer, nil)
-	finallyRan := false
-	expectedName := ""
-	panicWithFinally := func() {
-		expectedName = stacktraces.FunctionName()
-		defer logger.FinallyContext(
-			false,
-			func() { finallyRan = true },
-			context.Background(),
-			nil)
-		panic("deliberate")
-	}
-	panicWithFinally()
-	writer.Flush()
-	b := buffer.Bytes()
-	if !finallyRan {
-		t.Fatalf("expected 'finally' to have been execcuted")
-	}
-	type Entry struct {
-		Time       string `json:"time"`
-		Verbosity  string `json:"verbosity"`
-		Msg        string `json:"msg"`
-		StackTrace string `json:"stacktrace"`
-		Recovered  string `json:"recovered"`
-	}
-	entry := Entry{}
-	err := json.Unmarshal(b, &entry)
-	if err != nil {
-		t.Fatalf("error unmarshaling log entry: %s", err.Error())
-	}
-	if entry.Msg != "" {
-		t.Fatalf("expected msg to be empty, got '%s'", entry.Msg)
-	}
-	if entry.Recovered != "deliberate" {
-		t.Fatalf("expected recovered to be 'deliberate', got '%s'", entry.Recovered)
-	}
-	actualName, _, err := stacktraces_test.FirstFunctionShort(entry.StackTrace)
-	if err != nil {
-		t.Fatalf("error parsing stack trace: %s", err.Error())
-	}
-	if actualName != expectedName {
-		t.Fatalf("expected stack trace to start with '%s', got '%s'", expectedName, actualName)
-	}
-}
-
 func TestNilBuilder(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
@@ -997,5 +799,32 @@ func TestSetContext(t *testing.T) {
 	logger.SetContext(ctx)
 	if defaultContext != ctx {
 		t.Fatalf("expected defaultContext to be updated")
+	}
+}
+
+func TestMessageBuilderPanic(t *testing.T) {
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+	logger := New(writer, nil)
+	logger.Always(
+		func() string { panic("deliberate") },
+	)
+	writer.Flush()
+	b := buffer.Bytes()
+	fmt.Println(string(b))
+	entry := map[string]any{}
+	err := json.Unmarshal(b, &entry)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	tags := entry["tags"].([]string)
+	if len(tags) != 2 {
+		t.Errorf("expected 2 tags, git %#v", tags)
+	}
+	if !slices.Contains(tags, "PANIC") {
+		t.Errorf("expected %#v to contain \"PANIC\"", tags)
+	}
+	if !slices.Contains(tags, "LOGGING") {
+		t.Errorf("expected %#v to contain \"PANIC\"", tags)
 	}
 }

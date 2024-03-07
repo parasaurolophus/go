@@ -21,10 +21,6 @@ type (
 	// given logger.
 	MessageBuilder func() string
 
-	// Type of function passed as first argument to Logger.Defer() and
-	// Logger.DeferContext().
-	Finally func()
-
 	// Type of function passed to Logger.Defer() and Logger.DeferContext() to
 	// allow for including the value returned by recover() in the log entry.
 	RecoverHandler func(recovered any) string
@@ -152,59 +148,6 @@ func (l *Logger) AlwaysContext(ctx context.Context, message MessageBuilder, attr
 	l.log(ctx, ALWAYS, message, attributes...)
 }
 
-// See documentation for Logger.DeferContext().
-func (l *Logger) Finally(panicAgain bool, finally Finally, recoverHandler RecoverHandler, attributes ...any) {
-	l.finallyCommon(panicAgain, defaultContext, finally, recoverHandler, attributes...)
-}
-
-// For use with defer to log if a panic occurs.
-//
-// If recover() returns non-nil, its value will be passed to handler.
-//
-// Handler's return value will be used as the msg string in writing a log entry
-// using l.AlwaysContext().
-//
-// If panicAgain is true, any panics that occur while this deferred method is in
-// effect will be passed to panic() so as to cause the process to terminate
-// abnormally.
-//
-// For example, if the following is invoked in a goroutine that was passed a
-// channel named ch:
-//
-//	name := stacktraces.FunctionName()
-//	defer logger.FinallyContext(
-//
-//	    // don't cause process to exit abnormally even if a panic occurs
-//	    false,
-//
-//	    // clean-up function is always invoked
-//	    func() { close(ch) },
-//
-//	    // remaining parameters are passed to logger.AlwaysContext() when
-//	    // recover() returns non-nil
-//
-//	    ctx,
-//	    func(r any) (string, any) {
-//	        // second value will be used to resume panicing if non-nil
-//	        // (typically this would be r to continue the now tidied
-//	        // and logged panic in main.main or nil in a goroutine
-//	        // so as to allow other goroutines to complete)
-//	        return fmt.Sprintf("%s recovered from %v", name, r), nil
-//	    },
-//	)
-//
-// the goroutine will close ch on exit and, if a panic occurs, write a log entry
-// whose msg is the string representation of the value returned by
-// recover()while allowing other goroutines to continue running normally. If
-// panicAgain were passed true, recovered value would be passed to panic() after
-// the clean up and logging functions were invoked. The value of panicAgain is
-// also used to determine whether or not panics in the clean-up or message
-// builder functions cause an abnormal exit. [See the documentation for panic()
-// and recover() for more information.]
-func (l *Logger) FinallyContext(panicAgain bool, finally Finally, ctx context.Context, recoverHandler RecoverHandler, attributes ...any) {
-	l.finallyCommon(panicAgain, ctx, finally, recoverHandler, attributes...)
-}
-
 // Return true or false depending on whether or not the given verbosity is
 // currently enabled for the given logger.
 func (l *Logger) Enabled(verbosity Verbosity) bool {
@@ -260,8 +203,22 @@ func (l *Logger) log(ctx context.Context, verbosity Verbosity, message MessageBu
 		msg := ""
 
 		if message != nil {
-			defer l.FinallyContext(l.options.AllowPanics, nil, ctx, nil)
-			msg = message()
+			invoke := func() {
+				defer func() {
+					if r := recover(); r != nil {
+						l.AlwaysContext(
+							ctx,
+							func() string {
+								return fmt.Sprintf("panic by message builder; recovered: %v", r)
+							},
+							TAGS, []string{"PANIC", "LOGGING"},
+							STACKTRACE, nil,
+						)
+					}
+				}()
+				msg = message()
+			}
+			invoke()
 		}
 
 		attribs := []any{}
@@ -343,31 +300,6 @@ func appendTag(tags []string, tag any) []string {
 
 	default:
 		return append(tags, fmt.Sprintf("%v", v))
-	}
-}
-
-// Common implementation used by Logger.Finally() and Logger.FinallyContext()
-func (l *Logger) finallyCommon(panicAgain bool, ctx context.Context, finally Finally, recoverHandler RecoverHandler, attributes ...any) {
-
-	defer func() {
-		if finally != nil {
-			finally()
-		}
-	}()
-
-	if r := recover(); r != nil {
-
-		a := append(attributes, RECOVERED, r, STACKTRACE, -3)
-
-		if recoverHandler == nil {
-			l.AlwaysContext(ctx, nil, a...)
-		} else {
-			l.AlwaysContext(ctx, func() string { return recoverHandler(r) }, a...)
-		}
-
-		if panicAgain {
-			panic(r)
-		}
 	}
 }
 
