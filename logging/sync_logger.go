@@ -177,6 +177,11 @@ func (l *syncLogger) SetVerbosity(verbosity Verbosity) {
 	l.options.Level.Set(slog.Level(verbosity))
 }
 
+// Stop any asynchronous goroutines associated with this logger.
+func (l *syncLogger) Stop() {
+	// nothing to do here, but required by Logger interface.
+}
+
 // Implement lazy evaluation of all log entry formatting code.
 func (l *syncLogger) log(ctx context.Context, verbosity Verbosity, message MessageBuilder, attributes ...any) {
 

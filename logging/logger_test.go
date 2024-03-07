@@ -23,7 +23,7 @@ func TestTrace(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
-	SetVerbosity(logger, TRACE)
+	logger.SetVerbosity(TRACE)
 	logger.Trace(
 		func() string {
 			return "trace"
@@ -60,7 +60,7 @@ func TestTraceContext(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
-	SetVerbosity(logger, TRACE)
+	logger.SetVerbosity(TRACE)
 	ctx := context.Background()
 	logger.TraceContext(
 		ctx,
@@ -458,7 +458,7 @@ func TestNilBuilder(t *testing.T) {
 		BaseTags: []string{"test"},
 	}
 	logger := New(writer, &options)
-	SetBaseAttributes(logger, "counters", &counters)
+	logger.SetBaseAttributes("counters", &counters)
 	counters.Error1 += 1
 	logger.Always(nil, STACKTRACE, 0)
 	writer.Flush()
@@ -531,7 +531,7 @@ func TestLazyEvaluation(t *testing.T) {
 		},
 	}
 	logger := New(writer, &options)
-	if IsEnabled(logger, TRACE) {
+	if logger.Enabled(TRACE) {
 		t.Fatalf("expected TRACE to be disabled by default")
 	}
 	logger.Trace(
@@ -671,13 +671,13 @@ func TestUnrecognizedLevel(t *testing.T) {
 
 func TestBaseAttributes(t *testing.T) {
 	logger := New(os.Stdout, nil)
-	actual := GetBaseAttributes(logger)
+	actual := logger.BaseAttributes()
 	if len(actual) != 0 {
 		t.Fatalf("expected base attributes to be empty, got %v", actual)
 	}
 	expected := []any{"key", "value"}
-	SetBaseAttributes(logger, expected...)
-	actual = GetBaseAttributes(logger)
+	logger.SetBaseAttributes(expected...)
+	actual = logger.BaseAttributes()
 	if len(actual) != len(expected) {
 		t.Fatalf("expected %v to be the same as %v", actual, expected)
 	}
@@ -690,13 +690,13 @@ func TestBaseAttributes(t *testing.T) {
 
 func TestBaseTags(t *testing.T) {
 	logger := New(os.Stdout, nil)
-	actual := GetBaseTags(logger)
+	actual := logger.BaseTags()
 	if len(actual) != 0 {
 		t.Fatalf("expected base tags to be empty, got %v", actual)
 	}
 	expected := []string{"tag1", "tag2"}
-	SetBaseTags(logger, expected...)
-	actual = GetBaseTags(logger)
+	logger.SetBaseTags(expected...)
+	actual = logger.BaseTags()
 	if len(actual) != len(expected) {
 		t.Fatalf("expected %v to be the same as %v", actual, expected)
 	}
@@ -709,12 +709,12 @@ func TestBaseTags(t *testing.T) {
 
 func TestVerbosity(t *testing.T) {
 	logger := New(os.Stdout, nil)
-	actual := GetVerbosity(logger)
+	actual := logger.Verbosity()
 	if actual != FINE {
 		t.Fatalf("expected verbosity to be %d, got %d", FINE, actual)
 	}
-	SetVerbosity(logger, TRACE)
-	actual = GetVerbosity(logger)
+	logger.SetVerbosity(TRACE)
+	actual = logger.Verbosity()
 	if actual != TRACE {
 		t.Fatalf("expected verbosity to be %d, got %d", TRACE, actual)
 	}
@@ -917,70 +917,7 @@ func TestStringStackTraceParam(t *testing.T) {
 func TestIsEnableContext(t *testing.T) {
 
 	logger := New(os.Stdout, nil)
-	if IsEnabledContext(logger, context.Background(), TRACE) {
+	if logger.EnabledContext(context.Background(), TRACE) {
 		t.Fatalf("TRACE should be disabled by default")
-	}
-}
-
-func TestGetterSetterNil(t *testing.T) {
-
-	caught := false
-
-	catch := func(f func()) {
-
-		defer func() {
-			if r := recover(); r != nil {
-				caught = true
-			}
-		}()
-
-		f()
-	}
-
-	catch(func() { IsEnabled(nil, TRACE) })
-	if !caught {
-		t.Error("expected IsEnabled(nil, TRACE) to panic")
-	}
-
-	caught = false
-	catch(func() { IsEnabledContext(nil, context.Background(), TRACE) })
-	if !caught {
-		t.Error("expected IsEnabledContext(nil, context.Background(), TRACE) to panic")
-	}
-
-	caught = false
-	catch(func() { GetBaseAttributes(nil) })
-	if !caught {
-		t.Error("expected GetBaseAttributes(nil) to panic")
-	}
-
-	caught = false
-	catch(func() { SetBaseAttributes(nil, "foo", "bar") })
-	if !caught {
-		t.Error("expected SetBaseAttributes(nil, ...) to panic")
-	}
-
-	caught = false
-	catch(func() { GetBaseTags(nil) })
-	if !caught {
-		t.Error("expected GetBaseTags(nil) to panic")
-	}
-
-	caught = false
-	catch(func() { SetBaseTags(nil, "foo", "bar") })
-	if !caught {
-		t.Error("expected SetBaseTags(nil, ...) to panic")
-	}
-
-	caught = false
-	catch(func() { GetVerbosity(nil) })
-	if !caught {
-		t.Error("expected GetVerbosity(nil) to panic")
-	}
-
-	caught = false
-	catch(func() { SetVerbosity(nil, TRACE) })
-	if !caught {
-		t.Error("expected SetVerbosity(nil, TRACE) to panic")
 	}
 }

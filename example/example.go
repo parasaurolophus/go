@@ -45,6 +45,6 @@ func main() {
 	}()
 
 	logger.Trace(func() string { return "you won't see this" })
-	logging.SetVerbosity(logger, logging.TRACE)
+	logger.SetVerbosity(logging.TRACE)
 	panic("deliberate")
 }

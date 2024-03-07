@@ -4,7 +4,6 @@ package logging
 
 import (
 	"context"
-	"fmt"
 )
 
 type (
@@ -45,101 +44,33 @@ type (
 
 		// Log at ALWAYS verbosity using the supplied context.
 		AlwaysContext(ctx context.Context, message MessageBuilder, attributes ...any)
+
+		// Return true if and only if the specified verbosity is enabled.
+		Enabled(verbosity Verbosity) bool
+
+		// Return true if and only if the specified verbosity is enabled using
+		// the specified context.
+		EnabledContext(ctx context.Context, verbosity Verbosity) bool
+
+		// Return the enabled verbosity level.
+		Verbosity() Verbosity
+
+		// Update the enabled verbosity level.
+		SetVerbosity(verbosity Verbosity)
+
+		// Return the base attributes.
+		BaseAttributes() []any
+
+		// Update the base attributes.
+		SetBaseAttributes(attributes ...any)
+
+		// Return the base tags.
+		BaseTags() []string
+
+		// Update the base tags.
+		SetBaseTags(tags ...string)
+
+		// Stop any asynchronous goroutines associated with this logger.
+		Stop()
 	}
 )
-
-func IsEnabled(logger Logger, verbosity Verbosity) bool {
-
-	switch l := logger.(type) {
-
-	case *syncLogger:
-		return l.Enabled(verbosity)
-
-	default:
-		panic(fmt.Sprintf("can't set verbosity of loggers of type %T", l))
-	}
-}
-
-func IsEnabledContext(logger Logger, ctx context.Context, verbosity Verbosity) bool {
-
-	switch l := logger.(type) {
-
-	case *syncLogger:
-		return l.EnabledContext(ctx, verbosity)
-
-	default:
-		panic(fmt.Sprintf("can't set verbosity of loggers of type %T", l))
-	}
-}
-
-func GetBaseAttributes(logger Logger) []any {
-
-	switch l := logger.(type) {
-
-	case *syncLogger:
-		return l.BaseAttributes()
-
-	default:
-		panic(fmt.Sprintf("can't set base attributes of loggers of type %T", l))
-	}
-}
-
-func SetBaseAttributes(logger Logger, attributes ...any) {
-
-	switch l := logger.(type) {
-
-	case *syncLogger:
-		l.SetBaseAttributes(attributes...)
-
-	default:
-		panic(fmt.Sprintf("can't set base attributes of loggers of type %T", l))
-	}
-}
-
-func GetBaseTags(logger Logger) []string {
-
-	switch l := logger.(type) {
-
-	case *syncLogger:
-		return l.BaseTags()
-
-	default:
-		panic(fmt.Sprintf("can't set base tags of loggers of type %T", l))
-	}
-}
-
-func SetBaseTags(logger Logger, tags ...string) {
-
-	switch l := logger.(type) {
-
-	case *syncLogger:
-		l.SetBaseTags(tags...)
-
-	default:
-		panic(fmt.Sprintf("can't set base tags of loggers of type %T", l))
-	}
-}
-
-func GetVerbosity(logger Logger) Verbosity {
-
-	switch l := logger.(type) {
-
-	case *syncLogger:
-		return l.Verbosity()
-
-	default:
-		panic(fmt.Sprintf("can't set verbosity of loggers of type %T", l))
-	}
-}
-
-func SetVerbosity(logger Logger, verbosity Verbosity) {
-
-	switch l := logger.(type) {
-
-	case *syncLogger:
-		l.SetVerbosity(verbosity)
-
-	default:
-		panic(fmt.Sprintf("can't set verbosity of loggers of type %T", l))
-	}
-}
