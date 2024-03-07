@@ -198,7 +198,7 @@ func (l *syncLogger) log(ctx context.Context, verbosity Verbosity, message Messa
 							func() string {
 								return fmt.Sprintf("panic by message builder; recovered: %v", r)
 							},
-							TAGS, []string{"PANIC", "LOGGING"},
+							TAGS, []string{PANIC, INJECTED},
 							RECOVERED, r,
 							STACKTRACE, nil,
 						)
