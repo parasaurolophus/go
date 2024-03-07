@@ -843,3 +843,87 @@ func TestMessageBuilderPanic(t *testing.T) {
 		t.Errorf("expected \"deliberate\", got \"%s\"", entry.Recovered)
 	}
 }
+
+func TestNegativeStackTraceParam(t *testing.T) {
+	_, expected, _, _, _ := stacktraces.FunctionInfo(-2)
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+	logger := New(writer, nil)
+	logger.Always(nil, STACKTRACE, -2)
+	writer.Flush()
+	b := buffer.Bytes()
+	type Entry struct {
+		Time       string `json:"time"`
+		Verbosity  string `json:"verbosity"`
+		Msg        string `json:"msg"`
+		StackTrace string `json:"stacktrace"`
+	}
+	entry := Entry{}
+	err := json.Unmarshal(b, &entry)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	actual, _, err := stacktraces_test.FirstFunctionShort(entry.StackTrace)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	if actual != expected {
+		t.Fatalf("expected \"%s\", got \"%s\"", expected, actual)
+	}
+}
+
+func TestZeroStackTraceParam(t *testing.T) {
+	_, expected, _, _, _ := stacktraces.FunctionInfo(0)
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+	logger := New(writer, nil)
+	logger.Always(nil, STACKTRACE, 0)
+	writer.Flush()
+	b := buffer.Bytes()
+	type Entry struct {
+		Time       string `json:"time"`
+		Verbosity  string `json:"verbosity"`
+		Msg        string `json:"msg"`
+		StackTrace string `json:"stacktrace"`
+	}
+	entry := Entry{}
+	err := json.Unmarshal(b, &entry)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	actual, _, err := stacktraces_test.FirstFunctionShort(entry.StackTrace)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	if actual != expected {
+		t.Fatalf("expected \"%s\", got \"%s\"", expected, actual)
+	}
+}
+
+func TestStringStackTraceParam(t *testing.T) {
+	expected := stacktraces.FunctionName()
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+	logger := New(writer, nil)
+	logger.Always(nil, STACKTRACE, expected)
+	writer.Flush()
+	b := buffer.Bytes()
+	type Entry struct {
+		Time       string `json:"time"`
+		Verbosity  string `json:"verbosity"`
+		Msg        string `json:"msg"`
+		StackTrace string `json:"stacktrace"`
+	}
+	entry := Entry{}
+	err := json.Unmarshal(b, &entry)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	actual, _, err := stacktraces_test.FirstFunctionShort(entry.StackTrace)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	if actual != expected {
+		t.Fatalf("expected \"%s\", got \"%s\"", expected, actual)
+	}
+}
