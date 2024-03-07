@@ -7,148 +7,44 @@ import (
 	"os"
 	"parasaurolophus/go/logging"
 	"parasaurolophus/go/stacktraces"
-	"strconv"
 )
 
-var (
-
-	// The number of values sent by a goroutine.
-	sent = 0
-
-	// The number of values received from the goroutine.
-	received = 0
-
-	// Logger configuration.
-	loggerOptions = logging.LoggerOptions{
-		BaseTags: []string{"EXAMPLE"},
-		BaseAttributes: []any{
-			"sent", &sent,
-			"received", &received,
-		},
-	}
-
-	// Logger.
-	logger = logging.New(os.Stdout, &loggerOptions)
-)
-
-// Print the number of values sent by and received from a goroutine to stdout.
-//
-// Logging verbosity defaults to OPTIONAL but may be set using a command-line
-// argument.
 func main() {
 
-	functionName := stacktraces.FunctionName()
-	verbosity := logger.Verbosity()
-	panicInMain := false
-	panicAgain := true
-	argv := os.Args
-	argc := len(argv)
+	_, functionName, fileName, _, _ := stacktraces.FunctionInfo(nil)
 
-	defer logger.Finally(
-		panicAgain,
-		func() {
-			defer func() { fmt.Println() }()
-			logger.Optional(nil, logging.TAGS, "DEBUG")
-		},
-		func(r any) string {
-			return fmt.Sprintf("%s panicing: %v", functionName, r)
-		},
-		logging.STACKTRACE, functionName,
-		logging.TAGS, []string{"PANIC", "SEVERE"})
+	counter := 0
 
-	parseArg(argv, argc, 1, "logging.Verbosity", &verbosity)
-	logger.SetVerbosity(verbosity)
-	parseArg(argv, argc, 2, "bool", &panicInMain)
-	parseArg(argv, argc, 3, "bool", &panicAgain)
-	fmt.Printf("\nverbosity: %s, panicInMain: %v, panicAgain: %v\n\n", verbosity, panicInMain, panicAgain)
-
-	ch := make(chan int)
-	logger.Trace(
-		func() string { return fmt.Sprintf("%s starting sender goroutine", functionName) },
-		logging.TAGS, "DEBUG")
-
-	go sender(ch)
-
-	logger.Trace(
-		func() string { return fmt.Sprintf("%s consuming output from sender goroutine", functionName) },
-		logging.TAGS, "DEBUG")
-
-	for v := range ch {
-		received += 1
-		logger.Fine(func() string { return strconv.Itoa(v) })
+	loggerOptions := logging.LoggerOptions{
+		BaseTags: []string{fileName},
+		// Set base attributes using pointers when their values might change
+		// over time.
+		//                               |
+		//                               V
+		BaseAttributes: []any{"counter", &counter},
 	}
 
-	fmt.Printf("\n%d sent, %d received\n\n", sent, received)
+	logger := logging.New(os.Stdout, &loggerOptions)
 
-	if panicInMain {
-		panic("another deliberate panic")
-	}
-
-	logger.Trace(func() string { return fmt.Sprintf("%s exiting normally", functionName) })
-}
-
-// Goroutine that sends int values to a channel.
-//
-// This deliberately panics after sending a few values as a demonstration of
-// logging.Logger.Defer().
-func sender(ch chan int) {
-
-	functionName := stacktraces.FunctionName()
-
-	defer logger.Finally(
-		false,
-		func() {
-			logger.Trace(func() string { return fmt.Sprintf("%s goroutine closing channel", functionName) })
-			close(ch)
-		},
-		func(recovered any) string {
-			return fmt.Sprintf("%s recovered from: %v", functionName, recovered)
-		},
-		logging.STACKTRACE, functionName,
-		logging.TAGS, []string{"PANIC", "MEDIUM"})
-
-	for v := 0; v < 10; v++ {
-		if v > 4 {
-			logger.Trace(func() string { return "sender deliberately causing a panic" })
-			panic("deliberate panic")
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Always(
+				func() string {
+					return fmt.Sprintf("recovered: %v", r)
+				},
+				logging.RECOVERED, r,
+				logging.TAGS, []string{"PANIC"},
+			)
 		}
-		sent += 1
-		ch <- v
-	}
-}
-
-// Parse an optional argument if it was supplied
-func parseArg(argv []string, argc int, index int, typeName string, val any) {
-
-	if argc <= index {
-		logger.Fine(
-			func() string { return fmt.Sprintf("optional argument %d (of type %s) not supplied", index, typeName) },
-			logging.TAGS, "DEBUG")
-		return
-	}
-
-	n, err := fmt.Sscan(argv[index], val)
-
-	if err != nil {
-		logger.Optional(
-			func() string { return err.Error() },
-			logging.STACKTRACE, nil,
-			logging.TAGS, []string{"ERROR", "USER", "BAD_ARGS"},
+		counter += 1
+		logger.Trace(
+			func() string {
+				return fmt.Sprintf("exiting %s", functionName)
+			},
 		)
-		panic(fmt.Sprintf("BAD_ARG_%02d", index))
-	}
+	}()
 
-	if n != 1 {
-		msg := fmt.Sprintf("expected 1 %s, got %d", typeName, n)
-		logger.Optional(
-			func() string { return msg },
-			logging.STACKTRACE, nil,
-			logging.TAGS, []string{"ERROR", "USER", "BAD_ARGS"},
-		)
-		panic(fmt.Sprintf("BAD_ARG_%02d", index))
-	}
-
-	logger.Trace(
-		func() string { return fmt.Sprintf("parsed arg %d: %v", index, val) },
-		logging.TAGS, "DEBUG")
+	logger.Trace(func() string { return "you won't see this" })
+	logger.SetVerbosity(logging.TRACE)
+	panic("deliberate")
 }
