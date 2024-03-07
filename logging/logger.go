@@ -212,6 +212,7 @@ func (l *Logger) log(ctx context.Context, verbosity Verbosity, message MessageBu
 								return fmt.Sprintf("panic by message builder; recovered: %v", r)
 							},
 							TAGS, []string{"PANIC", "LOGGING"},
+							RECOVERED, r,
 							STACKTRACE, nil,
 						)
 					}

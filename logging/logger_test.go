@@ -810,21 +810,36 @@ func TestMessageBuilderPanic(t *testing.T) {
 		func() string { panic("deliberate") },
 	)
 	writer.Flush()
-	b := buffer.Bytes()
-	fmt.Println(string(b))
-	entry := map[string]any{}
-	err := json.Unmarshal(b, &entry)
+	s := buffer.String()
+	parts := strings.Split(s, "\n")
+	fmt.Println(parts[0])
+	if len(parts) < 2 {
+		t.Fatalf("expected 2 entries, got \"%s\"", s)
+	}
+	type Entry struct {
+		Time       string   `json:"time"`
+		Verbosity  string   `json:"verbosity"`
+		Msg        string   `json:"msg"`
+		StackTrace string   `json:"stacktrace"`
+		Recovered  string   `json:"recovered"`
+		Tags       []string `json:"tags"`
+	}
+	entry := Entry{}
+	err := json.Unmarshal([]byte(parts[0]), &entry)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Fatalf(err.Error())
 	}
-	tags := entry["tags"].([]string)
-	if len(tags) != 2 {
-		t.Errorf("expected 2 tags, git %#v", tags)
+	fmt.Println(entry)
+	if len(entry.Tags) < 2 {
+		t.Fatalf("expected 2 tags, git %#v", entry.Tags)
 	}
-	if !slices.Contains(tags, "PANIC") {
-		t.Errorf("expected %#v to contain \"PANIC\"", tags)
+	if !slices.Contains(entry.Tags, "PANIC") {
+		t.Errorf("expected %#v to contain \"PANIC\"", entry.Tags)
 	}
-	if !slices.Contains(tags, "LOGGING") {
-		t.Errorf("expected %#v to contain \"PANIC\"", tags)
+	if !slices.Contains(entry.Tags, "LOGGING") {
+		t.Errorf("expected %#v to contain \"PANIC\"", entry.Tags)
+	}
+	if entry.Recovered != "deliberate" {
+		t.Errorf("expected \"deliberate\", got \"%s\"", entry.Recovered)
 	}
 }
