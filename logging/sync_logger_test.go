@@ -19,7 +19,7 @@ import (
 	"parasaurolophus/go/stacktraces_test"
 )
 
-func TestTrace(t *testing.T) {
+func TestSyncTrace(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
@@ -56,7 +56,7 @@ func TestTrace(t *testing.T) {
 	}
 }
 
-func TestTraceContext(t *testing.T) {
+func TestSyncTraceContext(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
@@ -95,7 +95,7 @@ func TestTraceContext(t *testing.T) {
 	}
 }
 
-func TestFine(t *testing.T) {
+func TestSyncFine(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
@@ -127,7 +127,7 @@ func TestFine(t *testing.T) {
 	}
 }
 
-func TestFineContext(t *testing.T) {
+func TestSyncFineContext(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
@@ -161,7 +161,7 @@ func TestFineContext(t *testing.T) {
 	}
 }
 
-func TestOptional(t *testing.T) {
+func TestSyncOptional(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
@@ -193,7 +193,7 @@ func TestOptional(t *testing.T) {
 	}
 }
 
-func TestOptionalContext(t *testing.T) {
+func TestSyncOptionalContext(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
@@ -227,7 +227,7 @@ func TestOptionalContext(t *testing.T) {
 	}
 }
 
-func TestAlways(t *testing.T) {
+func TestSyncAlways(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	type Counters struct {
@@ -334,7 +334,7 @@ func TestAlways(t *testing.T) {
 	}
 }
 
-func TestAlwaysContext(t *testing.T) {
+func TestSyncAlwaysContext(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	type Counters struct {
@@ -443,7 +443,7 @@ func TestAlwaysContext(t *testing.T) {
 	}
 }
 
-func TestNilBuilder(t *testing.T) {
+func TestSyncNilBuilder(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	type errorCounters struct {
@@ -520,7 +520,7 @@ func TestNilBuilder(t *testing.T) {
 	}
 }
 
-func TestLazyEvaluation(t *testing.T) {
+func TestSyncLazyEvaluation(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	replacerCalled := false
@@ -549,7 +549,7 @@ func TestLazyEvaluation(t *testing.T) {
 	}
 }
 
-func TestIntTag(t *testing.T) {
+func TestSyncIntTag(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	options := LoggerOptions{
@@ -581,7 +581,7 @@ func TestIntTag(t *testing.T) {
 	}
 }
 
-func TestStringTag(t *testing.T) {
+func TestSyncStringTag(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	options := LoggerOptions{
@@ -613,7 +613,7 @@ func TestStringTag(t *testing.T) {
 	}
 }
 
-func TestStringerTag(t *testing.T) {
+func TestSyncStringerTag(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	options := LoggerOptions{
@@ -645,7 +645,7 @@ func TestStringerTag(t *testing.T) {
 	}
 }
 
-func TestUnrecognizedLevel(t *testing.T) {
+func TestSyncUnrecognizedLevel(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	ctx := context.Background()
@@ -669,7 +669,7 @@ func TestUnrecognizedLevel(t *testing.T) {
 	}
 }
 
-func TestBaseAttributes(t *testing.T) {
+func TestSyncBaseAttributes(t *testing.T) {
 	logger := New(os.Stdout, nil)
 	actual := logger.BaseAttributes()
 	if len(actual) != 0 {
@@ -688,7 +688,7 @@ func TestBaseAttributes(t *testing.T) {
 	}
 }
 
-func TestBaseTags(t *testing.T) {
+func TestSyncBaseTags(t *testing.T) {
 	logger := New(os.Stdout, nil)
 	actual := logger.BaseTags()
 	if len(actual) != 0 {
@@ -707,7 +707,7 @@ func TestBaseTags(t *testing.T) {
 	}
 }
 
-func TestVerbosity(t *testing.T) {
+func TestSyncVerbosity(t *testing.T) {
 	logger := New(os.Stdout, nil)
 	actual := logger.Verbosity()
 	if actual != FINE {
@@ -720,7 +720,7 @@ func TestVerbosity(t *testing.T) {
 	}
 }
 
-func TestOddAttributes(t *testing.T) {
+func TestSyncOddAttributes(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	options := LoggerOptions{
@@ -761,7 +761,7 @@ func TestOddAttributes(t *testing.T) {
 	}
 }
 
-func TestBadKey(t *testing.T) {
+func TestSyncBadKey(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
@@ -788,7 +788,7 @@ func TestBadKey(t *testing.T) {
 	}
 }
 
-func TestMessageBuilderPanic(t *testing.T) {
+func TestSyncMessageBuilderPanic(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
@@ -819,18 +819,18 @@ func TestMessageBuilderPanic(t *testing.T) {
 	if len(entry.Tags) < 2 {
 		t.Fatalf("expected 2 tags, git %#v", entry.Tags)
 	}
-	if !slices.Contains(entry.Tags, "PANIC") {
-		t.Errorf("expected %#v to contain \"PANIC\"", entry.Tags)
+	if !slices.Contains(entry.Tags, PANIC) {
+		t.Errorf("expected %#v to contain \"%s\"", PANIC, entry.Tags)
 	}
-	if !slices.Contains(entry.Tags, "LOGGING") {
-		t.Errorf("expected %#v to contain \"PANIC\"", entry.Tags)
+	if !slices.Contains(entry.Tags, INJECTED) {
+		t.Errorf("expected %#v to contain \"%s\"", INJECTED, entry.Tags)
 	}
 	if entry.Recovered != "deliberate" {
 		t.Errorf("expected \"deliberate\", got \"%s\"", entry.Recovered)
 	}
 }
 
-func TestNegativeStackTraceParam(t *testing.T) {
+func TestSyncNegativeStackTraceParam(t *testing.T) {
 	_, expected, _, _, _ := stacktraces.FunctionInfo(-2)
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
@@ -858,7 +858,7 @@ func TestNegativeStackTraceParam(t *testing.T) {
 	}
 }
 
-func TestZeroStackTraceParam(t *testing.T) {
+func TestSyncZeroStackTraceParam(t *testing.T) {
 	_, expected, _, _, _ := stacktraces.FunctionInfo(0)
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
@@ -886,7 +886,7 @@ func TestZeroStackTraceParam(t *testing.T) {
 	}
 }
 
-func TestStringStackTraceParam(t *testing.T) {
+func TestSyncStringStackTraceParam(t *testing.T) {
 	expected := stacktraces.FunctionName()
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
@@ -914,10 +914,22 @@ func TestStringStackTraceParam(t *testing.T) {
 	}
 }
 
-func TestIsEnableContext(t *testing.T) {
+func TestSyncIsEnableContext(t *testing.T) {
 
 	logger := New(os.Stdout, nil)
 	if logger.EnabledContext(context.Background(), TRACE) {
 		t.Fatalf("TRACE should be disabled by default")
 	}
+}
+
+func TestSyncStop(t *testing.T) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("recovered %v from panic", r)
+		}
+	}()
+
+	logger := New(os.Stdout, nil)
+	logger.Stop()
 }
