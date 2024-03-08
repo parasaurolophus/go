@@ -1007,6 +1007,7 @@ func TestFileForPanic(t *testing.T) {
 }
 
 func TestFileSkipFramesError(t *testing.T) {
+
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
@@ -1035,5 +1036,92 @@ func TestFileSkipFramesError(t *testing.T) {
 
 	if !slices.Contains(entry.Tags, FILE_ATTR_ERROR) {
 		t.Errorf("expected %#v to contain %s", entry.Tags, FILE_ATTR_ERROR)
+	}
+}
+
+func TestStringerAttribute(t *testing.T) {
+
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+	logger := New(writer, nil)
+	logger.Always(nil, FINE, "stringer")
+	writer.Flush()
+	b := buffer.Bytes()
+
+	type Entry struct {
+		Time      string `json:"time"`
+		Verbosity string `json:"verbosity"`
+		Msg       string `json:"msg"`
+		File      int    `json:"file"`
+		Fine      string `json:"FINE"`
+	}
+
+	entry := Entry{}
+	err := json.Unmarshal(b, &entry)
+
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	if entry.Fine != "stringer" {
+		t.Errorf("expected \"stringer\", got \"%s\"", entry.Fine)
+	}
+}
+
+func TestFuncAtttrValue(t *testing.T) {
+
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+	logger := New(writer, nil)
+	logger.Always(nil, "func", func() any { return "func value" })
+	writer.Flush()
+	b := buffer.Bytes()
+
+	type Entry struct {
+		Time      string `json:"time"`
+		Verbosity string `json:"verbosity"`
+		Msg       string `json:"msg"`
+		File      int    `json:"file"`
+		Func      string `json:"func"`
+	}
+
+	entry := Entry{}
+	err := json.Unmarshal(b, &entry)
+
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	if entry.Func != "func value" {
+		t.Errorf("expected \"func value\", got \"%s\"", entry.Func)
+	}
+}
+
+func TestFuncAtttrPanic(t *testing.T) {
+
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+	logger := New(writer, nil)
+	logger.Always(nil, "func", func() any { panic("deliberate") })
+	writer.Flush()
+	b := buffer.Bytes()
+
+	type Entry struct {
+		Time      string `json:"time"`
+		Verbosity string `json:"verbosity"`
+		Msg       string `json:"msg"`
+		File      int    `json:"file"`
+		Func      string `json:"func"`
+	}
+
+	entry := Entry{}
+	err := json.Unmarshal(b, &entry)
+
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	if entry.Func != "recovered: deliberate" {
+		t.Errorf("expected \"recovered: deliberate\", got \"%s\"", entry.Func)
 	}
 }

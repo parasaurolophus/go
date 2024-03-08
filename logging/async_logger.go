@@ -174,6 +174,12 @@ func (l *asyncLogger) SetBaseTags(tags ...string) {
 	l.synced.SetBaseTags(tags...)
 }
 
+// Stop the worker goroutine.
+func (l *asyncLogger) Stop() {
+	close(l.logChan)
+	<-l.ackChan
+}
+
 // Invoked as a goroutine by NewAsync().
 func (l asyncLogger) worker() {
 
@@ -186,12 +192,6 @@ func (l asyncLogger) worker() {
 
 		l.synced.log(params.ctx, params.verbosity, params.message, params.attributes...)
 	}
-}
-
-// Stop the worker goroutine.
-func (l *asyncLogger) Stop() {
-	close(l.logChan)
-	<-l.ackChan
 }
 
 func NewAsync(writer io.Writer, options *LoggerOptions) Logger {

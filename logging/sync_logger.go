@@ -268,10 +268,27 @@ func (l *syncLogger) log(ctx context.Context, verbosity Verbosity, message Messa
 // not a string.
 func appendAttribute(attributes []any, key any, val any) []any {
 
+	switch v := val.(type) {
+
+	case func() any:
+		invoke := func() {
+			defer func() {
+				if r := recover(); r != nil {
+					val = fmt.Sprintf("recovered: %v", r)
+				}
+			}()
+			val = v()
+		}
+		invoke()
+	}
+
 	switch k := key.(type) {
 
 	case string:
 		return append(attributes, k, val)
+
+	case fmt.Stringer:
+		return append(attributes, k.String(), val)
 
 	default:
 		return attributes
