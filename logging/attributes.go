@@ -5,8 +5,8 @@ package logging
 // Specially handled attributes.
 const (
 
-	// Logger.Defer() and Logger.DeferContext() will include the value returned
-	// by recover() when logging a panic.
+	// syncLogger.log() will include the value returned by recover() when
+	// logging a panic.
 	RECOVERED = "recovered"
 
 	// Values of "stacktrace" attributes will be replaced with one-line stack
