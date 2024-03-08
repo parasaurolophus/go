@@ -5,6 +5,10 @@ package logging
 // Specially handled attributes.
 const (
 
+	// Conventional attribute for including source file information in a log
+	// entry.
+	FILE = "file"
+
 	// syncLogger.log() will include the value returned by recover() when
 	// logging a panic.
 	RECOVERED = "recovered"

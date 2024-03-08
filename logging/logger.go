@@ -74,3 +74,12 @@ type (
 		Stop()
 	}
 )
+
+const (
+
+	// Value to use for FILE attribute when logging normal functionality.
+	FILE_SKIPFRAMES_FOR_CALLER = -2
+
+	// Value to use for FILE attribute when logging a panic.
+	FILE_SKIPFRAMES_FOR_PANIC = -4
+)

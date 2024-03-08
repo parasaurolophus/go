@@ -164,7 +164,7 @@ func TestStackTraceFloat(t *testing.T) {
 
 func TestStackTraceAuto(t *testing.T) {
 
-	_, functionName, _, _, ok := FunctionInfo(-2)
+	_, sourceInfo, ok := FunctionInfo(-2)
 	if !ok {
 		t.Fatalf("FunctionInfo(-2) returned false")
 	}
@@ -185,16 +185,16 @@ func TestStackTraceAuto(t *testing.T) {
 	if m != n {
 		t.Fatalf("expected frame numbers to be the same, got %d, %d", m, n)
 	}
-	if firstLong != functionName {
-		t.Fatalf("expected long trace to start with '%s', got '%s'", functionName, firstLong)
+	if firstLong != sourceInfo.Function {
+		t.Fatalf("expected long trace to start with '%s', got '%s'", sourceInfo.Function, firstLong)
 	}
-	if firstShort != functionName {
-		t.Fatalf("expected short trace to start with '%s', got '%s'", functionName, firstShort)
+	if firstShort != sourceInfo.Function {
+		t.Fatalf("expected short trace to start with '%s', got '%s'", sourceInfo.Function, firstShort)
 	}
 }
 
 func TestLongStackTraceAuto(t *testing.T) {
-	_, functionName, _, _, _ := FunctionInfo(-1)
+	_, sourceInfo, _ := FunctionInfo(-1)
 	trace := LongStackTrace(-1)
 	name, n, err := stacktraces_test.FirstFunctionLong(trace)
 	if err != nil {
@@ -203,8 +203,8 @@ func TestLongStackTraceAuto(t *testing.T) {
 	if n <= 0 {
 		t.Fatalf("expected frame number to be greater than 0, got %d", n)
 	}
-	if name != functionName {
-		t.Fatalf("expected first function to be '%s', got '%s'", functionName, name)
+	if name != sourceInfo.Function {
+		t.Fatalf("expected first function to be '%s', got '%s'", sourceInfo.Function, name)
 	}
 }
 

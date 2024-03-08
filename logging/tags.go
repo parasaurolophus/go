@@ -4,11 +4,12 @@ package logging
 
 // Standard tags.
 const (
-	ALERT      = "ALERT"
-	DEBUG      = "DEBUG"
-	ERROR      = "ERROR"
-	INJECTED   = "INJECTED"
-	LOGGING    = "LOGGING"
-	MONITORING = "MONITORING"
-	PANIC      = "PANIC"
+	ALERT           = "ALERT"
+	DEBUG           = "DEBUG"
+	ERROR           = "ERROR"
+	FILE_ATTR_ERROR = "FILE_ATTR_ERROR"
+	INJECTED        = "INJECTED"
+	LOGGING         = "LOGGING"
+	MONITORING      = "MONITORING"
+	PANIC           = "PANIC"
 )

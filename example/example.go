@@ -9,12 +9,16 @@ import (
 	"parasaurolophus/go/stacktraces"
 )
 
+func deliberatePanic() {
+	panic("deliberate")
+}
+
 // Writes three (not four) log entries to stdout and exits with status code 1
 // due to a deliberately caused panic.
 //
-//	{"time":"2024-03-08T04:00:47.671436247-06:00","verbosity":"TRACE","msg":"you will see this","counter":0,"tags":["EXAMPLE"]}
-//	{"time":"2024-03-08T04:00:47.67194538-06:00","verbosity":"ALWAYS","msg":"recovered: deliberate","counter":1,"recovered":"deliberate","stacktrace":"5:main.main.func1 [/source/go/example/example.go:54] < 6:runtime.gopanic [/usr/local/go/src/runtime/panic.go:770] < 7:main.main [/source/go/example/example.go:91] < 8:runtime.main [/usr/local/go/src/runtime/proc.go:271] < 9:runtime.goexit [/usr/local/go/src/runtime/asm_arm64.s:1222]","tags":["EXAMPLE","PANIC"]}
-//	{"time":"2024-03-08T04:00:47.671993582-06:00","verbosity":"TRACE","msg":"exiting main.main","counter":1,"tags":["EXAMPLE"]}
+//	{"time":"2024-03-08T05:26:46.4746015-06:00","verbosity":"TRACE","msg":"you will see this","counter":0,"file":{"function":"main.main","file":"/source/go/example/example.go","line":94},"tags":["EXAMPLE"]}
+//	{"time":"2024-03-08T05:26:46.475051796-06:00","verbosity":"ALWAYS","msg":"recovered: deliberate","counter":1,"recovered":"deliberate","file":{"function":"main.deliberatePanic","file":"/source/go/example/example.go","line":13},"stacktrace":"5:main.main.func1 [/source/go/example/example.go:59] < 6:runtime.gopanic [/usr/local/go/src/runtime/panic.go:770] < 7:main.deliberatePanic [/source/go/example/example.go:13] < 8:main.main [/source/go/example/example.go:101] < 9:runtime.main [/usr/local/go/src/runtime/proc.go:271] < 10:runtime.goexit [/usr/local/go/src/runtime/asm_arm64.s:1222]","tags":["EXAMPLE","PANIC"]}
+//	{"time":"2024-03-08T05:26:46.475093777-06:00","verbosity":"TRACE","msg":"exiting main.main","counter":1,"tags":["EXAMPLE"]}
 func main() {
 
 	// Get the calling function's name -- main.main in this case.
@@ -44,7 +48,8 @@ func main() {
 		// Check to see if a panic occurred.
 		r := recover()
 
-		// Always log a stack trace and the recovered value when a panic occurs.
+		// Always log a stack trace, source info, and recovered value when a
+		// panic occurs.
 		if r != nil {
 
 			// Increment counter.
@@ -58,6 +63,7 @@ func main() {
 				logging.STACKTRACE, nil,
 				logging.RECOVERED, r,
 				logging.TAGS, []string{logging.PANIC},
+				logging.FILE, logging.FILE_SKIPFRAMES_FOR_PANIC,
 			)
 		}
 
@@ -85,8 +91,12 @@ func main() {
 
 	// Now logger.Trace() is included in output. Note that counter is 0 in this
 	// entry.
-	logger.Trace(func() string { return "you will see this" })
+	logger.Trace(
+		func() string {
+			return "you will see this"
+		},
+		logging.FILE, logging.FILE_SKIPFRAMES_FOR_CALLER)
 
 	// Deliberately cause a panic so as to demonstrate deferred logging.
-	panic("deliberate")
+	deliberatePanic()
 }

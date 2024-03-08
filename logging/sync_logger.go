@@ -226,12 +226,23 @@ func (l *syncLogger) log(ctx context.Context, verbosity Verbosity, message Messa
 		for index, attrib := range combined {
 			if index < max && index%2 == 0 {
 				switch attrib {
-				case TAGS:
-					tags = appendTag(tags, combined[index+1])
+
+				case FILE:
+					_, sourceInfo, ok := stacktraces.FunctionInfo(combined[index+1])
+					if ok {
+						attribs = appendAttribute(attribs, attrib, sourceInfo)
+					} else {
+						attribs = appendAttribute(attribs, attrib, combined[index+1])
+						tags = appendTag(tags, FILE_ATTR_ERROR)
+					}
 
 				case STACKTRACE:
 					stackTraceValue = convertSkipFrames(combined[index+1])
 					includeStackTrace = true
+
+				case TAGS:
+					tags = appendTag(tags, combined[index+1])
+
 				default:
 					attribs = appendAttribute(attribs, attrib, combined[index+1])
 				}

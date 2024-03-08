@@ -8,26 +8,26 @@ import (
 )
 
 func TestFunctionInfoNil(t *testing.T) {
-	frame, actualName, actualFile, actuaLine, found := FunctionInfo(nil)
+	frame, sourceInfo, found := FunctionInfo(nil)
 	if !found {
 		t.Fatalf("function info for nil returned false as its last value")
 	}
 	if frame != defaultSkip {
 		t.Fatalf("expected frame to be %d, got %d", defaultSkip, frame)
 	}
-	if !strings.HasSuffix(actualName, ".TestFunctionInfoNil") {
-		t.Fatalf("expected name to end with '.TestFunctionInfoNil', got '%s'", actualName)
+	if !strings.HasSuffix(sourceInfo.Function, ".TestFunctionInfoNil") {
+		t.Fatalf("expected name to end with '.TestFunctionInfoNil', got '%s'", sourceInfo.Function)
 	}
-	if !strings.HasSuffix(actualFile, "/function_info_test.go") {
-		t.Fatalf("expected file name to be 'function_info_test.go', got '%s'", actualFile)
+	if !strings.HasSuffix(sourceInfo.File, "/function_info_test.go") {
+		t.Fatalf("expected file name to be 'function_info_test.go', got '%s'", sourceInfo.File)
 	}
-	if actuaLine != 11 {
-		t.Fatalf("expected line to be 11, got %d", actuaLine)
+	if sourceInfo.Line != 11 {
+		t.Fatalf("expected line to be 11, got %d", sourceInfo.Line)
 	}
 }
 
 func TestFunctionInfoNegative(t *testing.T) {
-	frame, _, _, _, found := FunctionInfo(-1)
+	frame, _, found := FunctionInfo(-1)
 	if !found {
 		t.Fatalf("function info for nil returned false as its last value")
 	}
@@ -37,53 +37,50 @@ func TestFunctionInfoNegative(t *testing.T) {
 }
 
 func TestFunctionInfoPositive(t *testing.T) {
-	_, actualName, actualFile, _, found := FunctionInfo(1)
+	_, sourceInfo, found := FunctionInfo(1)
 	if !found {
 		t.Fatalf("function info for nil returned false as its last value")
 	}
-	if !strings.HasSuffix(actualName, ".functionInfo") {
-		t.Fatalf("expected name to end with '.functionInfo', got '%s'", actualName)
+	if !strings.HasSuffix(sourceInfo.Function, ".functionInfo") {
+		t.Fatalf("expected name to end with '.functionInfo', got '%s'", sourceInfo.Function)
 	}
-	if !strings.HasSuffix(actualFile, "/function_info.go") {
-		t.Fatalf("expected file name to be 'function_info.go', got '%s'", actualFile)
+	if !strings.HasSuffix(sourceInfo.File, "/function_info.go") {
+		t.Fatalf("expected file name to be 'function_info.go', got '%s'", sourceInfo.File)
 	}
 }
 
 func TestFunctionInfoString(t *testing.T) {
 	expected := FunctionName()
-	frame, actualName, actualFile, actualLine, found := FunctionInfo(expected)
+	frame, sourceInfo, found := FunctionInfo(expected)
 	if !found {
 		t.Fatalf("function info for nil returned false as its last value")
 	}
 	if frame != defaultSkip {
 		t.Fatalf("expected frame to be %d, got %d", defaultSkip, frame)
 	}
-	if actualName != expected {
-		t.Fatalf("expected name to be '%s', got '%s'", expected, actualName)
+	if sourceInfo.Function != expected {
+		t.Fatalf("expected name to be '%s', got '%s'", expected, sourceInfo.Function)
 	}
-	if !strings.HasSuffix(actualFile, "/function_info_test.go") {
-		t.Fatalf("expected file name to be 'function_info_test.go', got '%s'", actualFile)
+	if !strings.HasSuffix(sourceInfo.File, "/function_info_test.go") {
+		t.Fatalf("expected file name to be 'function_info_test.go', got '%s'", sourceInfo.File)
 	}
-	if actualLine != 54 {
-		t.Fatalf("expected line to be 54, got %d", actualLine)
+	if sourceInfo.Line != 54 {
+		t.Fatalf("expected line to be 54, got %d", sourceInfo.Line)
 	}
 }
 
 func TestFunctionInfoStringNotFound(t *testing.T) {
-	frame, name, file, line, found := FunctionInfo("stacktraces.New")
+	frame, sourceInfo, found := FunctionInfo("stacktraces.New")
 	if found {
 		t.Fatalf(
-			"expected 'stacktraces.New' not to be on call stack, got (%d, %s, %s, %d, %v)",
-			frame,
-			name,
-			file,
-			line,
-			found)
+			"expected 'stacktraces.New' not to be on call stack, got %v at frame %d",
+			sourceInfo,
+			frame)
 	}
 }
 
 func TestFunctionInfoDepth(t *testing.T) {
-	_, _, _, _, found := FunctionInfo(100)
+	_, _, found := FunctionInfo(100)
 	if found {
 		t.Fatalf("expected found to return false")
 	}

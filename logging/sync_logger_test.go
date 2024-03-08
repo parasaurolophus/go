@@ -831,7 +831,7 @@ func TestSyncMessageBuilderPanic(t *testing.T) {
 }
 
 func TestSyncNegativeStackTraceParam(t *testing.T) {
-	_, expected, _, _, _ := stacktraces.FunctionInfo(-2)
+	_, sourceInfo, _ := stacktraces.FunctionInfo(-2)
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
@@ -853,13 +853,13 @@ func TestSyncNegativeStackTraceParam(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	if actual != expected {
-		t.Fatalf("expected \"%s\", got \"%s\"", expected, actual)
+	if actual != sourceInfo.Function {
+		t.Fatalf("expected \"%s\", got \"%s\"", sourceInfo.Function, actual)
 	}
 }
 
 func TestSyncZeroStackTraceParam(t *testing.T) {
-	_, expected, _, _, _ := stacktraces.FunctionInfo(0)
+	_, sourceInfo, _ := stacktraces.FunctionInfo(0)
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
@@ -881,8 +881,8 @@ func TestSyncZeroStackTraceParam(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	if actual != expected {
-		t.Fatalf("expected \"%s\", got \"%s\"", expected, actual)
+	if actual != sourceInfo.Function {
+		t.Fatalf("expected \"%s\", got \"%s\"", sourceInfo.Function, actual)
 	}
 }
 
@@ -932,4 +932,108 @@ func TestSyncStop(t *testing.T) {
 
 	logger := New(os.Stdout, nil)
 	logger.Stop()
+}
+
+func TestFileForCaller(t *testing.T) {
+
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+	logger := New(writer, nil)
+	logger.Always(nil, FILE, FILE_SKIPFRAMES_FOR_CALLER)
+	writer.Flush()
+	b := buffer.Bytes()
+
+	type Entry struct {
+		Time      string                 `json:"time"`
+		Verbosity string                 `json:"verbosity"`
+		Msg       string                 `json:"msg"`
+		File      stacktraces.SourceInfo `json:"file"`
+	}
+
+	entry := Entry{}
+	err := json.Unmarshal(b, &entry)
+
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	expected := stacktraces.FunctionName()
+
+	if entry.File.Function != expected {
+		t.Errorf("expected \"%s\", got \"%s\"", expected, entry.File.Function)
+	}
+}
+
+func TestFileForPanic(t *testing.T) {
+
+	expected := stacktraces.FunctionName()
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+	logger := New(writer, nil)
+
+	defer func() {
+
+		r := recover()
+
+		if r == nil {
+			t.Fatalf("expected a panic")
+		}
+
+		logger.Always(nil, FILE, FILE_SKIPFRAMES_FOR_PANIC)
+
+		writer.Flush()
+		b := buffer.Bytes()
+
+		type Entry struct {
+			Time      string                 `json:"time"`
+			Verbosity string                 `json:"verbosity"`
+			Msg       string                 `json:"msg"`
+			File      stacktraces.SourceInfo `json:"file"`
+		}
+
+		entry := Entry{}
+		err := json.Unmarshal(b, &entry)
+
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
+
+		if entry.File.Function != expected {
+			t.Errorf("expected \"%s\", got \"%s\"", expected, entry.File.Function)
+		}
+	}()
+
+	panic("deliberate")
+}
+
+func TestFileSkipFramesError(t *testing.T) {
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+	logger := New(writer, nil)
+	logger.Always(nil, FILE, 100)
+	writer.Flush()
+	b := buffer.Bytes()
+
+	type Entry struct {
+		Time      string   `json:"time"`
+		Verbosity string   `json:"verbosity"`
+		Msg       string   `json:"msg"`
+		File      int      `json:"file"`
+		Tags      []string `json:"tags"`
+	}
+
+	entry := Entry{}
+	err := json.Unmarshal(b, &entry)
+
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+
+	if entry.File != 100 {
+		t.Errorf("expected 100, got %d", entry.File)
+	}
+
+	if !slices.Contains(entry.Tags, FILE_ATTR_ERROR) {
+		t.Errorf("expected %#v to contain %s", entry.Tags, FILE_ATTR_ERROR)
+	}
 }

@@ -9,8 +9,8 @@ import (
 // Return the name of the function that called this one, i.e. the currently
 // executing function from that function's point of view.
 func FunctionName() string {
-	_, name, _, _, _ := functionInfo(nil)
-	return name
+	_, sourceInfo, _ := functionInfo(nil)
+	return sourceInfo.Function
 }
 
 // Return call stack info for a function that directly or indirectly called this
@@ -28,12 +28,12 @@ func FunctionName() string {
 //     found
 //
 // If the last value is false, the others are set to their "zero values."
-func FunctionInfo(skipFrames any) (int, string, string, int, bool) {
+func FunctionInfo(skipFrames any) (int, SourceInfo, bool) {
 	return functionInfo(skipFrames)
 }
 
 // Common implementation for FunctionName() and FunctionInfo()
-func functionInfo(skipFrames any) (int, string, string, int, bool) {
+func functionInfo(skipFrames any) (int, SourceInfo, bool) {
 
 	var (
 		skip                     = 0
@@ -60,7 +60,7 @@ func functionInfo(skipFrames any) (int, string, string, int, bool) {
 	n := runtime.Callers(skip, pc)
 
 	if n < 1 {
-		return 0, "", "", 0, false
+		return 0, SourceInfo{"", "", 0}, false
 	}
 
 	pc = pc[:n]
@@ -72,11 +72,11 @@ func functionInfo(skipFrames any) (int, string, string, int, bool) {
 		frame, more := frames.Next()
 
 		if frameTest(&frame) {
-			return count, frame.Function, frame.File, frame.Line, true
+			return count, SourceInfo{frame.Function, frame.File, frame.Line}, true
 		}
 
 		if !more {
-			return 0, "", "", 0, false
+			return 0, SourceInfo{"", "", 0}, false
 		}
 
 		count += 1
