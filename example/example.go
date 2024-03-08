@@ -33,7 +33,7 @@ func main() {
 					return fmt.Sprintf("recovered: %v", r)
 				},
 				logging.RECOVERED, r,
-				logging.TAGS, []string{"PANIC"},
+				logging.TAGS, []string{logging.PANIC},
 			)
 		}
 		counter += 1
