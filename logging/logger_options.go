@@ -16,9 +16,6 @@ type LoggerOptions struct {
 	// Initial set of tags that will be added to every log entry.
 	BaseTags []string
 
-	// Pass through to HandlerOptions for the wrapped slog.Logger.
-	AddSource bool
-
 	// Shared slog.LevelVar, if desired; a Leveler will be created if this is
 	// nil.
 	Level *slog.LevelVar

@@ -88,7 +88,7 @@ func New(writer io.Writer, options *LoggerOptions) Logger {
 	}
 
 	handlerOptions := new(slog.HandlerOptions)
-	handlerOptions.AddSource = logger.options.AddSource
+	handlerOptions.AddSource = false
 	handlerOptions.Level = logger.options.Level
 	handlerOptions.ReplaceAttr = newAttrReplacer(logger.options.ReplaceAttr)
 	logger.wrapped = slog.New(slog.NewJSONHandler(writer, handlerOptions))
