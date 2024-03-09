@@ -190,7 +190,13 @@ func (l asyncLogger) worker() {
 
 	for params := range l.logChan {
 
-		l.synced.log(params.ctx, params.verbosity, params.message, params.attributes...)
+		log := func() {
+			defer l.settingsMtx.Unlock()
+			l.settingsMtx.Lock()
+			l.synced.log(params.ctx, params.verbosity, params.message, params.attributes...)
+		}
+
+		log()
 	}
 }
 
