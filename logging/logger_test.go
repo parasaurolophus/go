@@ -649,7 +649,7 @@ func TestSyncUnrecognizedLevel(t *testing.T) {
 	writer := bufio.NewWriter(&buffer)
 	ctx := context.Background()
 	lgr := New(writer, nil)
-	wrapped := lgr.(*syncLogger).wrapped
+	wrapped := lgr.wrapped
 	wrapped.Log(ctx, slog.Level(100), "slog.Level(100)")
 	writer.Flush()
 	b := buffer.Bytes()

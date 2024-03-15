@@ -13,13 +13,31 @@ import (
 
 type (
 
-	// Wrapper for an instance of slog.syncLogger.
-	syncLogger struct {
+	// Type of function passed to logging methods for lazy evaluation of message
+	// formatting.
+	//
+	// The returned string becomes the value of the log entry's msg attribute.
+	//
+	// Such a function is invoked only if a given verbosity is enabled for a
+	// given logger.
+	MessageBuilder func() string
+
+	// Wrapper for an instance of slog.Logger.
+	Logger struct {
 		// This logger's configuration.
 		options LoggerOptions
 		// The wrapped slog.Logger.
 		wrapped *slog.Logger
 	}
+)
+
+const (
+
+	// Value to use for FILE attribute when logging normal functionality.
+	FILE_SKIPFRAMES_FOR_CALLER = -2
+
+	// Value to use for FILE attribute when logging a panic.
+	FILE_SKIPFRAMES_FOR_PANIC = -4
 )
 
 var (
@@ -76,9 +94,9 @@ var (
 // be passed by value or reference. Passing by reference allows for cases where
 // each log entry should include the current value for that attribute rather
 // than a copy of the value at the time the Logger was created.
-func New(writer io.Writer, options *LoggerOptions) Logger {
+func New(writer io.Writer, options *LoggerOptions) *Logger {
 
-	logger := new(syncLogger)
+	logger := new(Logger)
 
 	if options != nil {
 		logger.options = *options
@@ -97,94 +115,94 @@ func New(writer io.Writer, options *LoggerOptions) Logger {
 }
 
 // Log at TRACE verbosity.
-func (l *syncLogger) Trace(message MessageBuilder, attributes ...any) {
+func (l *Logger) Trace(message MessageBuilder, attributes ...any) {
 	l.log(defaultContext, TRACE, message, attributes...)
 }
 
 // Log at TRACE verbosity using the supplied context.
-func (l *syncLogger) TraceContext(ctx context.Context, message MessageBuilder, attributes ...any) {
+func (l *Logger) TraceContext(ctx context.Context, message MessageBuilder, attributes ...any) {
 	l.log(ctx, TRACE, message, attributes...)
 }
 
 // Log at FINE verbosity.
-func (l *syncLogger) Fine(message MessageBuilder, attributes ...any) {
+func (l *Logger) Fine(message MessageBuilder, attributes ...any) {
 	l.log(defaultContext, FINE, message, attributes...)
 }
 
 // Log at FINE verbosity using the supplied context.
-func (l *syncLogger) FineContext(ctx context.Context, message MessageBuilder, attributes ...any) {
+func (l *Logger) FineContext(ctx context.Context, message MessageBuilder, attributes ...any) {
 	l.log(ctx, FINE, message, attributes...)
 }
 
 // Log at OPTIONAL verbosity.
-func (l *syncLogger) Optional(message MessageBuilder, attributes ...any) {
+func (l *Logger) Optional(message MessageBuilder, attributes ...any) {
 	l.log(defaultContext, OPTIONAL, message, attributes...)
 }
 
 // Log at OPTIONAL verbosity using the supplied context.
-func (l *syncLogger) OptionalContext(ctx context.Context, message MessageBuilder, attributes ...any) {
+func (l *Logger) OptionalContext(ctx context.Context, message MessageBuilder, attributes ...any) {
 	l.log(ctx, OPTIONAL, message, attributes...)
 }
 
 // Log at ALWAYS verbosity.
-func (l *syncLogger) Always(message MessageBuilder, attributes ...any) {
+func (l *Logger) Always(message MessageBuilder, attributes ...any) {
 	l.log(defaultContext, ALWAYS, message, attributes...)
 }
 
 // Log at ALWAYS verbosity using the supplied context.
-func (l *syncLogger) AlwaysContext(ctx context.Context, message MessageBuilder, attributes ...any) {
+func (l *Logger) AlwaysContext(ctx context.Context, message MessageBuilder, attributes ...any) {
 	l.log(ctx, ALWAYS, message, attributes...)
 }
 
 // Return true or false depending on whether or not the given verbosity is
 // currently enabled for the given logger.
-func (l *syncLogger) Enabled(verbosity Verbosity) bool {
+func (l *Logger) Enabled(verbosity Verbosity) bool {
 	return l.EnabledContext(defaultContext, verbosity)
 }
 
 // Return true or false depending on whether or not the given verbosity is
 // currently enabled for the given logger.
-func (l *syncLogger) EnabledContext(ctx context.Context, verbosity Verbosity) bool {
+func (l *Logger) EnabledContext(ctx context.Context, verbosity Verbosity) bool {
 	return l.wrapped.Enabled(ctx, slog.Level(verbosity))
 }
 
 // Return the current base attributes.
-func (l *syncLogger) BaseAttributes() []any {
+func (l *Logger) BaseAttributes() []any {
 	return l.options.BaseAttributes
 }
 
 // Update the base attributes.
-func (l *syncLogger) SetBaseAttributes(attributes ...any) {
+func (l *Logger) SetBaseAttributes(attributes ...any) {
 	l.options.BaseAttributes = attributes
 }
 
 // Return the current base tags.
-func (l *syncLogger) BaseTags() []string {
+func (l *Logger) BaseTags() []string {
 	return l.options.BaseTags
 }
 
 // Update the base tags.
-func (l *syncLogger) SetBaseTags(tags ...string) {
+func (l *Logger) SetBaseTags(tags ...string) {
 	l.options.BaseTags = tags
 }
 
 // Return the current verbosity
-func (l *syncLogger) Verbosity() Verbosity {
+func (l *Logger) Verbosity() Verbosity {
 	return Verbosity(l.options.Level.Level())
 }
 
 // Update the verbosity
-func (l *syncLogger) SetVerbosity(verbosity Verbosity) {
+func (l *Logger) SetVerbosity(verbosity Verbosity) {
 	l.options.Level.Set(slog.Level(verbosity))
 }
 
 // Stop any asynchronous goroutines associated with this logger.
-func (l *syncLogger) Stop() {
+func (l *Logger) Stop() {
 	// nothing to do here, but required by Logger interface.
 }
 
 // Implement lazy evaluation of all log entry formatting code.
-func (l *syncLogger) log(context context.Context, verbosity Verbosity, messageBuilder MessageBuilder, attributes ...any) {
+func (l *Logger) log(context context.Context, verbosity Verbosity, messageBuilder MessageBuilder, attributes ...any) {
 
 	if l.wrapped.Enabled(context, slog.Level(verbosity)) {
 
@@ -242,7 +260,7 @@ func (l *syncLogger) log(context context.Context, verbosity Verbosity, messageBu
 }
 
 // Safely invoke injected messageBuilder function.
-func (l *syncLogger) invokeMessageBuilder(context context.Context, messageBuilder MessageBuilder) string {
+func (l *Logger) invokeMessageBuilder(context context.Context, messageBuilder MessageBuilder) string {
 
 	defer l.logPanic(context)
 
@@ -253,7 +271,7 @@ func (l *syncLogger) invokeMessageBuilder(context context.Context, messageBuilde
 	return ""
 }
 
-func (l *syncLogger) logPanic(context context.Context) {
+func (l *Logger) logPanic(context context.Context) {
 
 	if r := recover(); r != nil {
 		l.AlwaysContext(
@@ -273,7 +291,7 @@ func (l *syncLogger) logPanic(context context.Context) {
 //
 // Simply returns the given attributes list without appending anything if key is
 // not a string.
-func (l *syncLogger) appendAttribute(context context.Context, attributes []any, key any, val any) []any {
+func (l *Logger) appendAttribute(context context.Context, attributes []any, key any, val any) []any {
 
 	switch v := val.(type) {
 
@@ -296,7 +314,7 @@ func (l *syncLogger) appendAttribute(context context.Context, attributes []any, 
 }
 
 // Safely invoke injected attribute value function.
-func (l *syncLogger) invokeAttrHandler(context context.Context, handler func() any) any {
+func (l *Logger) invokeAttrHandler(context context.Context, handler func() any) any {
 
 	defer l.logPanic(context)
 	return handler()

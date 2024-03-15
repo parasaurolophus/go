@@ -43,7 +43,7 @@ func main() {
 	}
 
 	// Create an asynchronous logger.
-	logger := logging.NewAsync(os.Stdout, &loggerOptions)
+	logger := logging.New(os.Stdout, &loggerOptions)
 
 	// Log every exit from main.
 	defer finally(logger)
@@ -73,7 +73,7 @@ func uncheckedPointer(p *int) {
 
 // Invoked by main() using defer to ensure logging on exit, even if a panic
 // occurs.
-func finally(logger logging.Logger) {
+func finally(logger *logging.Logger) {
 
 	// Check to see if a panic occurred.
 	r := recover()
@@ -105,9 +105,6 @@ func finally(logger logging.Logger) {
 			logging.FILE, logging.FILE_SKIPFRAMES_FOR_PANIC,
 		)
 	}
-
-	// Calling Stop() allows for a clean shutdown of an asynchronous logger.
-	logger.Stop()
 
 	// Signal an unsuccessful exit status when a panic has occurred.
 	if r != nil {
