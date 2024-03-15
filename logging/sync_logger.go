@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"parasaurolophus/go/stacktraces"
 )
 
@@ -183,32 +184,11 @@ func (l *syncLogger) Stop() {
 }
 
 // Implement lazy evaluation of all log entry formatting code.
-func (l *syncLogger) log(ctx context.Context, verbosity Verbosity, message MessageBuilder, attributes ...any) {
+func (l *syncLogger) log(context context.Context, verbosity Verbosity, messageBuilder MessageBuilder, attributes ...any) {
 
-	if l.wrapped.Enabled(ctx, slog.Level(verbosity)) {
+	if l.wrapped.Enabled(context, slog.Level(verbosity)) {
 
-		msg := ""
-
-		if message != nil {
-			invoke := func() {
-				defer func() {
-					if r := recover(); r != nil {
-						l.AlwaysContext(
-							ctx,
-							func() string {
-								return fmt.Sprintf("panic by message builder; recovered: %v", r)
-							},
-							TAGS, []string{PANIC, INJECTED},
-							RECOVERED, r,
-							STACKTRACE, nil,
-						)
-					}
-				}()
-				msg = message()
-			}
-			invoke()
-		}
-
+		msg := l.invokeMessageBuilder(context, messageBuilder)
 		attribs := []any{}
 		combined := append(l.options.BaseAttributes, attributes...)
 		includeStackTrace := false
@@ -230,9 +210,9 @@ func (l *syncLogger) log(ctx context.Context, verbosity Verbosity, message Messa
 				case FILE:
 					_, sourceInfo, ok := stacktraces.FunctionInfo(combined[index+1])
 					if ok {
-						attribs = appendAttribute(attribs, attrib, sourceInfo)
+						attribs = l.appendAttribute(context, attribs, attrib, sourceInfo)
 					} else {
-						attribs = appendAttribute(attribs, attrib, combined[index+1])
+						attribs = l.appendAttribute(context, attribs, attrib, combined[index+1])
 						tags = appendTag(tags, FILE_ATTR_ERROR)
 					}
 
@@ -244,7 +224,7 @@ func (l *syncLogger) log(ctx context.Context, verbosity Verbosity, message Messa
 					tags = appendTag(tags, combined[index+1])
 
 				default:
-					attribs = appendAttribute(attribs, attrib, combined[index+1])
+					attribs = l.appendAttribute(context, attribs, attrib, combined[index+1])
 				}
 			}
 		}
@@ -257,7 +237,34 @@ func (l *syncLogger) log(ctx context.Context, verbosity Verbosity, message Messa
 			attribs = append(attribs, TAGS, tags)
 		}
 
-		l.wrapped.Log(ctx, slog.Level(verbosity), msg, attribs...)
+		l.wrapped.Log(context, slog.Level(verbosity), msg, attribs...)
+	}
+}
+
+// Safely invoke injected messageBuilder function.
+func (l *syncLogger) invokeMessageBuilder(context context.Context, messageBuilder MessageBuilder) string {
+
+	defer l.logPanic(context)
+
+	if messageBuilder != nil {
+		return messageBuilder()
+	}
+
+	return ""
+}
+
+func (l *syncLogger) logPanic(context context.Context) {
+
+	if r := recover(); r != nil {
+		l.AlwaysContext(
+			context,
+			func() string {
+				return fmt.Sprintf("panic by message builder; recovered: %v", r)
+			},
+			TAGS, []string{PANIC, INJECTED},
+			RECOVERED, r,
+			STACKTRACE, nil,
+		)
 	}
 }
 
@@ -266,20 +273,12 @@ func (l *syncLogger) log(ctx context.Context, verbosity Verbosity, message Messa
 //
 // Simply returns the given attributes list without appending anything if key is
 // not a string.
-func appendAttribute(attributes []any, key any, val any) []any {
+func (l *syncLogger) appendAttribute(context context.Context, attributes []any, key any, val any) []any {
 
 	switch v := val.(type) {
 
 	case func() any:
-		invoke := func() {
-			defer func() {
-				if r := recover(); r != nil {
-					val = fmt.Sprintf("recovered: %v", r)
-				}
-			}()
-			val = v()
-		}
-		invoke()
+		val = l.invokeAttrHandler(context, v)
 	}
 
 	switch k := key.(type) {
@@ -291,8 +290,16 @@ func appendAttribute(attributes []any, key any, val any) []any {
 		return append(attributes, k.String(), val)
 
 	default:
+		fmt.Fprintf(os.Stderr, "ignoring unsupported key, %v, of type %T", k, k)
 		return attributes
 	}
+}
+
+// Safely invoke injected attribute value function.
+func (l *syncLogger) invokeAttrHandler(context context.Context, handler func() any) any {
+
+	defer l.logPanic(context)
+	return handler()
 }
 
 // Return the result of merging base tags with those supplied as the value of a

@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"os"
 	"slices"
@@ -798,7 +797,6 @@ func TestSyncMessageBuilderPanic(t *testing.T) {
 	writer.Flush()
 	s := buffer.String()
 	parts := strings.Split(s, "\n")
-	fmt.Println(parts[0])
 	if len(parts) < 2 {
 		t.Fatalf("expected 2 entries, got \"%s\"", s)
 	}
@@ -815,7 +813,6 @@ func TestSyncMessageBuilderPanic(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	fmt.Println(entry)
 	if len(entry.Tags) < 2 {
 		t.Fatalf("expected 2 tags, git %#v", entry.Tags)
 	}
@@ -1104,24 +1101,52 @@ func TestFuncAtttrPanic(t *testing.T) {
 	logger := New(writer, nil)
 	logger.Always(nil, "func", func() any { panic("deliberate") })
 	writer.Flush()
-	b := buffer.Bytes()
+	s := buffer.String()
+	parts := strings.Split(s, "\n")
 
-	type Entry struct {
+	if len(parts) != 3 {
+		t.Fatalf("expected 2 parts, got %v", len(parts))
+	}
+
+	if parts[2] != "" {
+		t.Errorf("expected last part to be empty, got \"%s\"", parts[2])
+	}
+
+	type Entry1 struct {
+		Time       string   `json:"time"`
+		Verbosity  string   `json:"verbosity"`
+		Msg        string   `json:"msg"`
+		Recovered  string   `json:"recovered"`
+		StackTrace string   `json:"stacktrace"`
+		Tags       []string `json:"tags"`
+	}
+
+	entry1 := Entry1{}
+	err := json.Unmarshal([]byte(parts[0]), &entry1)
+
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	if entry1.Recovered != "deliberate" {
+		t.Errorf("expected \"deliberate\", got \"%s\"", entry1.Recovered)
+	}
+
+	type Entry2 struct {
 		Time      string `json:"time"`
 		Verbosity string `json:"verbosity"`
 		Msg       string `json:"msg"`
-		File      int    `json:"file"`
-		Func      string `json:"func"`
+		Func      string `json:"func,omitempty"`
 	}
 
-	entry := Entry{}
-	err := json.Unmarshal(b, &entry)
+	entry2 := Entry2{}
+	err = json.Unmarshal([]byte(parts[1]), &entry2)
 
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Error(err.Error())
 	}
 
-	if entry.Func != "recovered: deliberate" {
-		t.Errorf("expected \"recovered: deliberate\", got \"%s\"", entry.Func)
+	if entry2.Func != "" {
+		t.Errorf("expected entry2.func to be empty, got \"%s\"", entry2.Func)
 	}
 }
