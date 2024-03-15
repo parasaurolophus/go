@@ -12,14 +12,21 @@ This repository is organized as a Go module with three packages:
 * [logging](./logging) contains a `logging` package that provides a wrapper for
   `log/slog`
 
+* [stacktraces_test](./stacktraces_test/) contains helper functions used in unit
+  tests for both the `stacktraces` and `logging` packages
+
 * [example](./example) defines a stand-alone executable (a `main()` function in
   package `main`) that demonstrates the use of these packages
 
 ```mermaid
 graph TB
+
   example --> logging
-  example --> stacktraces
   logging --> stacktraces
+  logging -->|unit\ntests| stacktraces_test
+
+  example --> stacktraces
+  stacktraces --> |unit\ntests| stacktraces_test
 ```
 
 See [example/README.md](./example/README.md),
