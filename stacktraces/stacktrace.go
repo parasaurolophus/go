@@ -130,12 +130,12 @@ func longFrameFormatter() stackFrameFormatter {
 	return func(writer *bufio.Writer, frameNumber int, frame *runtime.Frame) {
 
 		if writeSeparator {
-			writer.WriteString("---\n")
+			writer.WriteString("---\n") //nolint:errcheck
 		} else {
 			writeSeparator = true
 		}
 
-		writer.WriteString(
+		writer.WriteString( //nolint:errcheck
 			fmt.Sprintf(
 				"%d:%s\n%s:%d\n%#v\n",
 				frameNumber,
@@ -154,12 +154,12 @@ func shortFrameFormatter() stackFrameFormatter {
 	return func(writer *bufio.Writer, frameNumber int, frame *runtime.Frame) {
 
 		if writeSeparator {
-			writer.WriteString(" < ")
+			writer.WriteString(" < ") //nolint:errcheck
 		} else {
 			writeSeparator = true
 		}
 
-		writer.WriteString(
+		writer.WriteString( //nolint:errcheck
 			fmt.Sprintf(
 				"%d:%s [%s:%d]",
 				frameNumber,
