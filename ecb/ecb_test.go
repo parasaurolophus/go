@@ -18,6 +18,17 @@ var ninetyDays string
 //go:embed eurofxref-daily.xml
 var daily string
 
+func TestFetchBadURL(t *testing.T) {
+	_, err := Fetch("bad")
+	if err == nil {
+		t.Error("expected error when Fetch() was passed an ill-formed URL")
+	}
+	_, err = Fetch("http://google.com")
+	if err == nil {
+		t.Error("expected error when Fetch() was passed a URL that responds with non-XML data")
+	}
+}
+
 func TestFetchNinetyDays(t *testing.T) {
 	data, err := Fetch(NinetyDayURL)
 	if err != nil {
