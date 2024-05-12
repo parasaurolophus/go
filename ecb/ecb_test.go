@@ -5,9 +5,7 @@ package ecb
 import (
 	"archive/zip"
 	"embed"
-	"encoding/json"
 	"io"
-	"os"
 	"testing"
 )
 
@@ -45,9 +43,6 @@ func TestFetchDailyXML(t *testing.T) {
 	if len(data) == 0 {
 		t.Error("empty response")
 	}
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "    ")
-	encoder.Encode(data)
 }
 
 func TestParseDailyCSV(t *testing.T) {
@@ -78,9 +73,6 @@ func TestParseDailyCSV(t *testing.T) {
 			t.Error("empty response")
 			continue
 		}
-		encoder := json.NewEncoder(os.Stdout)
-		encoder.SetIndent("", "    ")
-		encoder.Encode(data)
 	}
 }
 
@@ -112,9 +104,6 @@ func TestParseHistoricalCSV(t *testing.T) {
 			t.Error("empty response")
 			continue
 		}
-		encoder := json.NewEncoder(os.Stdout)
-		encoder.SetIndent("", "    ")
-		encoder.Encode(data)
 	}
 }
 
@@ -131,9 +120,6 @@ func TestParseDailyXML(t *testing.T) {
 	if len(data) == 0 {
 		t.Error("empty response")
 	}
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "    ")
-	encoder.Encode(data)
 }
 
 func TestParseHistoricalXML(t *testing.T) {
@@ -149,9 +135,6 @@ func TestParseHistoricalXML(t *testing.T) {
 	if len(data) == 0 {
 		t.Error("empty response")
 	}
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "    ")
-	encoder.Encode(data)
 }
 
 func TestParseNinetyDayXML(t *testing.T) {
@@ -167,7 +150,4 @@ func TestParseNinetyDayXML(t *testing.T) {
 	if len(data) == 0 {
 		t.Error("empty response")
 	}
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "    ")
-	encoder.Encode(data)
 }
