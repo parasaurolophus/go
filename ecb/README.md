@@ -10,7 +10,7 @@ Copyright &copy; Kirk Rader 2024
 * `ecb.Fetch(string)` gets data from the specified URL via HTTP and parses it
   using `ecb.Parse(io.Reader)`.
 
-* `Parse(reader io.Reader)` parses a XML document to produce `ecb.ECBData`.
+* `ParseXML(reader io.Reader)` parses a XML document to produce `ecb.ECBData`.
 
 The `ecb.Data` type is designed to be compatible with JSON, noSQL data stores
 etc. at the cost of some denormalization of the original XML data.
@@ -27,11 +27,17 @@ CONSTANTS
 
 const (
 
-        // URL for the historical exchange rate data for the last ninety days.
-        NinetyDayURL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml"
+        // URL for the exchange rate CSV data for the current day.
+        DailyCSV = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref.zip"
 
-        // URL for the exchange rate for the current day.
-        DailyURL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
+        // URL for the exchange rate XML data for the current day.
+        DailyXML = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
+
+        // URL for the historical exchange rate CSV data.
+        HistoricalCSV = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.zip?d97ddc778eeacf1f68ced2782c0b589d"
+
+        // URL for the exchange rate XML data for the last 90 days.
+        NinetyDayXML = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml"
 )
 
 TYPES
@@ -42,7 +48,10 @@ type Data []Datum
 func Fetch(url string) (Data, error)
     Fetch the ECB XML data from the given URL and parse it.
 
-func Parse(reader io.Reader) (Data, error)
+func ParseCSV(reader io.Reader) (Data, error)
+    Parse the ECB CSV data from the given reader.
+
+func ParseXML(reader io.Reader) (Data, error)
     Parse the ECB XML data from the given reader.
 
 type Datum struct {

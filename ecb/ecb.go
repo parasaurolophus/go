@@ -4,11 +4,13 @@ package ecb
 
 import (
 	"cmp"
+	"encoding/csv"
 	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -43,19 +45,29 @@ type (
 
 	// List of ECB exchange rate data.
 	Data []Datum
+
+	Parser func(io.Reader) (Data, error)
 )
 
 const (
 
-	// URL for the historical exchange rate data for the last ninety days.
-	NinetyDayURL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml"
+	// URL for the exchange rate CSV data for the current day.
+	DailyCSV = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref.zip"
 
-	// URL for the exchange rate for the current day.
-	DailyURL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
+	// URL for the exchange rate XML data for the current day.
+	DailyXML = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
+
+	// URL for the historical exchange rate CSV data.
+	HistoricalCSV = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.zip"
+
+	HistoricalXML = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.xml"
+
+	// URL for the exchange rate XML data for the last 90 days.
+	NinetyDayXML = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml"
 )
 
-// Fetch the ECB XML data from the given URL and parse it.
-func Fetch(url string) (Data, error) {
+// Fetch ECB exchange rate data from the given URL and parse it.
+func Fetch(url string, parser Parser) (Data, error) {
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
@@ -63,11 +75,46 @@ func Fetch(url string) (Data, error) {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("HTTP status %d", resp.StatusCode)
 	}
-	return Parse(resp.Body)
+	return parser(resp.Body)
+}
+
+// Parse the ECB CSV data from the given reader.
+func ParseCSV(reader io.Reader) (Data, error) {
+	r := csv.NewReader(reader)
+	headers, err := r.Read()
+	if err != nil {
+		return nil, err
+	}
+	var data Data
+	for {
+		record, err := r.Read()
+		if err == io.EOF {
+			break
+		}
+		var datum Datum
+		for index, h := range headers {
+			header := strings.Trim(h, " ")
+			value := strings.Trim(record[index], " ")
+			if header == "Date" {
+				// TODO: convert value to ISO 8601
+				datum.Time = value
+			}
+			f, err := strconv.ParseFloat(value, 64)
+			// ignore rates that can't be parsed since many columns contain "N/A"
+			if err != nil {
+				continue
+			}
+			datum.Currency = header
+			datum.Rate = f
+			data = append(data, datum)
+		}
+	}
+	slices.SortFunc(data, comparer)
+	return data, nil
 }
 
 // Parse the ECB XML data from the given reader.
-func Parse(reader io.Reader) (Data, error) {
+func ParseXML(reader io.Reader) (Data, error) {
 	timestamp := time.Now().Unix()
 	type (
 		rateCube struct {
