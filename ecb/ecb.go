@@ -39,7 +39,7 @@ type (
 		Timestamp int64 `json:"timestamp,omitempty"`
 
 		// Value of time attribute in the ECB data.
-		Time string `json:"time,omitempty"`
+		Date string `json:"time,omitempty"`
 
 		// ISO-4217 currency id.
 		Currency string `json:"currency,omitempty"`
@@ -88,14 +88,16 @@ func Fetch(url string, parser Parser) (Data, error) {
 // Parse the ECB CSV data from the given reader.
 func ParseCSV(reader io.Reader) (Data, error) {
 	timestamp := time.Now().Unix()
-	// ECB CSV data is zipped and http.Response.Body() does not return an
-	// io.ReaderAt so we must buffer the whole file in memory as a work-around
-	// for incompatible Go library functions
+	///////////////////////////////////////////////////////////////////////////
+	// the zip,NewReader() constructor requires an io.ReaderAt which is
+	// incompatible with http.Response.Body() and so, as a work-around, we
+	// buffer the entire input in memory and create an bytes.ByteReader
 	b, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, err
 	}
 	r := bytes.NewReader(b)
+	///////////////////////////////////////////////////////////////////////////
 	z, err := zip.NewReader(r, int64(len(b)))
 	if err != nil {
 		return nil, err
@@ -147,7 +149,7 @@ func ParseXML(reader io.Reader) (Data, error) {
 		for _, rate := range timeCube.RateCubes {
 			result = append(result, Datum{
 				Timestamp: timestamp,
-				Time:      timeCube.Time,
+				Date:      timeCube.Time,
 				Currency:  rate.Currency,
 				Rate:      rate.Rate,
 			})
@@ -166,14 +168,14 @@ func comparer(a, b Datum) int {
 	if c := cmp.Compare(a.Timestamp, b.Timestamp); c != 0 {
 		return c
 	}
-	if c := cmp.Compare(a.Time, b.Time); c != 0 {
+	if c := cmp.Compare(a.Date, b.Date); c != 0 {
 		return c
 	}
 	return cmp.Compare(a.Currency, b.Currency)
 }
 
 // ECB CSV files have inconsitent date format strings; coerce them always to use
-// the same ISO 8601 format used in XML.
+// the same ISO 8601 format as in XML.
 func normalizeTime(s string) (string, error) {
 	_, err := time.Parse(time.DateOnly, s)
 	if err == nil {
@@ -234,7 +236,7 @@ func parseRecordCSV(timestamp int64, dateIndex int, headers, record []string) (D
 		if err != nil {
 			return nil, err
 		}
-		datum.Time = t
+		datum.Date = t
 		f, err := strconv.ParseFloat(value, 64)
 		// ignore rates that can't be parsed since many columns contain "N/A"
 		if err != nil {
