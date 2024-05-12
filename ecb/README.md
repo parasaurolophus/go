@@ -7,13 +7,15 @@ Copyright &copy; Kirk Rader 2024
 
 * `ecb.Data` is an alias for `[]ecb.Datum`.
 
-* `ecb.Fetch(string)` gets data from the specified URL via HTTP and parses it
-  using `ecb.Parse(io.Reader)`.
+* `ecb.Fetch(string, ecb.Parser)` gets data from the specified URL via HTTP and
+  converts it using parsing function.
 
-* `ParseXML(reader io.Reader)` parses a XML document to produce `ecb.ECBData`.
+* `ParseXML(reader io.Reader)` parses a XML document to produce `ecb.Data`.
 
-The `ecb.Data` type is designed to be compatible with JSON, noSQL data stores
-etc. at the cost of some denormalization of the original XML data.
+* `ParseCSV(reader io.Reader)` parses a CSV document to produce `ecb.Data`.
+
+The `ecb.Data` type is designed to be compatible with JSON, noSQL data stores,
+etc. at the cost of some denormalization of the original ECB data.
 
 ---
 
@@ -34,7 +36,9 @@ const (
         DailyXML = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
 
         // URL for the historical exchange rate CSV data.
-        HistoricalCSV = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.zip?d97ddc778eeacf1f68ced2782c0b589d"
+        HistoricalCSV = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.zip"
+
+        HistoricalXML = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.xml"
 
         // URL for the exchange rate XML data for the last 90 days.
         NinetyDayXML = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml"
@@ -45,8 +49,8 @@ TYPES
 type Data []Datum
     List of ECB exchange rate data.
 
-func Fetch(url string) (Data, error)
-    Fetch the ECB XML data from the given URL and parse it.
+func Fetch(url string, parser Parser) (Data, error)
+    Fetch ECB exchange rate data from the given URL and parse it.
 
 func ParseCSV(reader io.Reader) (Data, error)
     Parse the ECB CSV data from the given reader.
@@ -79,4 +83,6 @@ type Datum struct {
 
     See
     https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html
+
+type Parser func(io.Reader) (Data, error)
 ```

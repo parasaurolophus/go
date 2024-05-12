@@ -3,7 +3,6 @@
 package ecb
 
 import (
-	"archive/zip"
 	"embed"
 	"io"
 	"testing"
@@ -35,6 +34,16 @@ func TestFetchBadURL(t *testing.T) {
 	}
 }
 
+func TestFetchDailyCSV(t *testing.T) {
+	data, err := Fetch(DailyCSV, ParseCSV)
+	if err != nil {
+		t.Error(err.Error())
+	}
+	if len(data) == 0 {
+		t.Error("empty response")
+	}
+}
+
 func TestFetchDailyXML(t *testing.T) {
 	data, err := Fetch(DailyXML, ParseXML)
 	if err != nil {
@@ -51,28 +60,12 @@ func TestParseDailyCSV(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	defer source.Close()
-	stat, err := source.Stat()
+	data, err := ParseCSV(source)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	r, err := zip.NewReader(source.(io.ReaderAt), int64(stat.Size()))
-	if err != nil {
-		t.Error(err.Error())
-	}
-	for _, f := range r.File {
-		contents, err := f.Open()
-		if err != nil {
-			t.Error(err.Error())
-			continue
-		}
-		data, err := ParseCSV(contents)
-		if err != nil {
-			t.Error(err.Error())
-		}
-		if len(data) == 0 {
-			t.Error("empty response")
-			continue
-		}
+	if len(data) < 1 {
+		t.Errorf("no data returned")
 	}
 }
 
@@ -82,28 +75,12 @@ func TestParseHistoricalCSV(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	defer source.Close()
-	stat, err := source.Stat()
+	data, err := ParseCSV(source)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	r, err := zip.NewReader(source.(io.ReaderAt), stat.Size())
-	if err != nil {
-		t.Error(err.Error())
-	}
-	for _, f := range r.File {
-		contents, err := f.Open()
-		if err != nil {
-			t.Error(err.Error())
-			continue
-		}
-		data, err := ParseCSV(contents)
-		if err != nil {
-			t.Error(err.Error())
-		}
-		if len(data) == 0 {
-			t.Error("empty response")
-			continue
-		}
+	if len(data) < 1 {
+		t.Errorf("no data returned")
 	}
 }
 
