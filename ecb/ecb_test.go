@@ -4,7 +4,6 @@ package ecb
 
 import (
 	"embed"
-	"io"
 	"testing"
 )
 
@@ -23,74 +22,92 @@ var historicalZip embed.FS
 //go:embed testdata/eurofxref-hist-90d.xml
 var ninetyDaysXML embed.FS
 
-func TestFetchBadURL(t *testing.T) {
-	_, err := Fetch("bad", ParseCSV)
-	if err == nil {
-		t.Error("expected error when Fetch() was passed an ill-formed URL")
-	}
-	_, err = Fetch("http://google.com", ParseXML)
-	if err == nil {
-		t.Error("expected error when Fetch() was passed a URL that responds with non-XML data")
-	}
-}
-
 func TestFetchDailyCSV(t *testing.T) {
-	data, err := Fetch(DailyCSV, ParseCSV)
+	reader, err := Fetch(DailyCSV)
 	if err != nil {
-		t.Error(err.Error())
+		t.Fatal(err.Error())
 	}
-	if len(data) == 0 {
-		t.Error("empty response")
+	files, err := Unzip(reader)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	if len(files) == 0 {
+		t.Fatal("empty zip file")
+	}
+	for _, file := range files {
+		data, err := ParseCSV(file)
+		if err != nil {
+			t.Error(err.Error())
+		}
+		if len(data) == 0 {
+			t.Error("empty CSV file")
+		}
 	}
 }
 
 func TestFetchDailyXML(t *testing.T) {
-	data, err := Fetch(DailyXML, ParseXML)
+	reader, err := Fetch(DailyXML)
 	if err != nil {
-		t.Error(err.Error())
+		t.Fatal(err.Error())
+	}
+	data, err := ParseXML(reader)
+	if err != nil {
+		t.Fatal(err.Error())
 	}
 	if len(data) == 0 {
-		t.Error("empty response")
+		t.Error("empty XML document")
 	}
 }
 
 func TestParseDailyCSV(t *testing.T) {
-	source, err := dailyZip.Open("testdata/eurofxref.zip")
+	zipFile, err := dailyZip.Open("testdata/eurofxref.zip")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	defer source.Close()
-	data, err := ParseCSV(source)
+	defer zipFile.Close()
+	csvFiles, err := Unzip(zipFile)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	if len(data) < 1 {
-		t.Errorf("no data returned")
+	for _, csvFile := range csvFiles {
+		data, err := ParseCSV(csvFile)
+		if err != nil {
+			t.Error(err.Error())
+		}
+		if len(data) < 1 {
+			t.Errorf("no data returned")
+		}
 	}
 }
 
 func TestParseHistoricalCSV(t *testing.T) {
-	source, err := historicalZip.Open("testdata/eurofxref-hist.zip")
+	zipFile, err := historicalZip.Open("testdata/eurofxref-hist.zip")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	defer source.Close()
-	data, err := ParseCSV(source)
+	defer zipFile.Close()
+	csvFiles, err := Unzip(zipFile)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	if len(data) < 1 {
-		t.Errorf("no data returned")
+	for _, csvFile := range csvFiles {
+		data, err := ParseCSV(csvFile)
+		if err != nil {
+			t.Error(err.Error())
+		}
+		if len(data) < 1 {
+			t.Errorf("no data returned")
+		}
 	}
 }
 
 func TestParseDailyXML(t *testing.T) {
-	source, err := dailyXML.Open("testdata/eurofxref-daily.xml")
+	xmlFile, err := dailyXML.Open("testdata/eurofxref-daily.xml")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	defer source.Close()
-	data, err := ParseXML(source.(io.ReadCloser))
+	defer xmlFile.Close()
+	data, err := ParseXML(xmlFile)
 	if err != nil {
 		t.Error(err.Error())
 	}
@@ -100,12 +117,12 @@ func TestParseDailyXML(t *testing.T) {
 }
 
 func TestParseHistoricalXML(t *testing.T) {
-	source, err := historicalXml.Open("testdata/eurofxref-hist.xml")
+	xmlFile, err := historicalXml.Open("testdata/eurofxref-hist.xml")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	defer source.Close()
-	data, err := ParseXML(source.(io.ReadCloser))
+	defer xmlFile.Close()
+	data, err := ParseXML(xmlFile)
 	if err != nil {
 		t.Error(err.Error())
 	}
@@ -115,12 +132,12 @@ func TestParseHistoricalXML(t *testing.T) {
 }
 
 func TestParseNinetyDayXML(t *testing.T) {
-	source, err := ninetyDaysXML.Open("testdata/eurofxref-hist-90d.xml")
+	xmlFile, err := ninetyDaysXML.Open("testdata/eurofxref-hist-90d.xml")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	defer source.Close()
-	data, err := ParseXML(source.(io.Reader))
+	defer xmlFile.Close()
+	data, err := ParseXML(xmlFile)
 	if err != nil {
 		t.Error(err.Error())
 	}

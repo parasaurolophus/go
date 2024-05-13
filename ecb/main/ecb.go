@@ -4,23 +4,102 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
+	"io"
 	"os"
 	"parasaurolophus/go/ecb"
 )
 
 // Invoke ecb.Fetch manually, to support interactive debugging.
 func main() {
-	data, err := ecb.Fetch(ecb.HistoricalCSV, ecb.ParseCSV)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(1)
-	}
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "    ")
-	err = encoder.Encode(data)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
+	format := flag.String("format", "csv", "csv or xml")
+	version := flag.String("version", "daily", "daily, ninety or historical")
+	parse := flag.Bool("parse", false, "true or false")
+	flag.Parse()
+	var url string
+	var parser ecb.Parser
+	if *format == "csv" {
+		parser = ecb.ParseCSV
+		switch *version {
+		case "daily":
+			url = ecb.DailyCSV
+		case "historical":
+			url = ecb.HistoricalCSV
+		default:
+			fmt.Fprintf(os.Stderr, `"%s" is not a valid version for csv\n`, *version)
+			flag.Usage()
+			os.Exit(1)
+		}
+	} else if *format == "xml" {
+		parser = ecb.ParseXML
+		switch *version {
+		case "daily":
+			url = ecb.DailyXML
+		case "historical":
+			url = ecb.HistoricalXML
+		case "ninety":
+			url = ecb.NinetyDayXML
+		default:
+			fmt.Fprintf(os.Stderr, `"%s" is not a valid version for csv\n`, *version)
+			flag.Usage()
+			os.Exit(1)
+		}
+	} else {
+		fmt.Fprintf(os.Stderr, `"%s" is not a valid format\n`, *format)
+		flag.Usage()
 		os.Exit(2)
+	}
+	source, err := ecb.Fetch(url)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(3)
+	}
+	var documents []io.ReadCloser
+	if *format == "csv" {
+		documents, err = ecb.Unzip(source)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, err.Error())
+			os.Exit(4)
+		}
+	} else {
+		documents = []io.ReadCloser{source}
+	}
+	for _, document := range documents {
+		defer document.Close()
+		if *parse {
+			data, err := parser(document)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, err.Error())
+				os.Exit(5)
+			}
+			encoder := json.NewEncoder(os.Stdout)
+			encoder.SetIndent("", "    ")
+			err = encoder.Encode(data)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err.Error())
+				os.Exit(6)
+			}
+		} else {
+			buffer := make([]byte, 1024)
+			for {
+				n, err := document.Read(buffer)
+				if n >= 0 {
+					buffer = buffer[:n]
+					_, e := os.Stdout.Write(buffer)
+					if e != nil {
+						fmt.Fprintln(os.Stderr, e.Error())
+						os.Exit(8)
+					}
+				}
+				if err == io.EOF {
+					return
+				}
+				if err != nil {
+					fmt.Fprintln(os.Stderr, err.Error())
+					os.Exit(9)
+				}
+			}
+		}
 	}
 }
