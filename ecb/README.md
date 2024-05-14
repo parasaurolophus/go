@@ -29,20 +29,6 @@ const (
         NinetyDayXML = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml"
 )
 
-FUNCTIONS
-
-func Fetch(url string) (io.ReadCloser, error)
-    Fetch a document from the given URL.
-
-func Unzip(reader io.ReadCloser) ([]io.ReadCloser, error)
-    Return an io.ReadCloser list, one for each entry in the given zip archive.
-
-    Warning: The zip.NewReader() constructor requires an io.ReaderAt which is
-    incompatible with http.Response.Body() and so, as a work-around, we buffer
-    the entire input in memory. Plan accordingly when provisioning to run this
-    code as a service!
-
-
 TYPES
 
 type Data []Datum

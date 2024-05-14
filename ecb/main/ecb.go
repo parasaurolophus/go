@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"parasaurolophus/go/ecb"
+	"parasaurolophus/go/utilities"
 )
 
 // Invoke ecb.Fetch manually, to support interactive debugging.
@@ -50,16 +51,16 @@ func main() {
 		flag.Usage()
 		os.Exit(2)
 	}
-	source, err := ecb.Fetch(url)
+	source, err := utilities.Fetch(url)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(3)
 	}
 	var documents []io.ReadCloser
 	if *format == "csv" {
-		documents, err = ecb.Unzip(source)
+		documents, err = utilities.Unzip(source)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, err.Error())
+			fmt.Fprint(os.Stderr, err.Error())
 			os.Exit(4)
 		}
 	} else {
@@ -70,7 +71,7 @@ func main() {
 		if *parse {
 			data, err := parser(document)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, err.Error())
+				fmt.Fprint(os.Stderr, err.Error())
 				os.Exit(5)
 			}
 			encoder := json.NewEncoder(os.Stdout)

@@ -4,6 +4,7 @@ package ecb
 
 import (
 	"embed"
+	"parasaurolophus/go/utilities"
 	"testing"
 )
 
@@ -23,11 +24,11 @@ var historicalZip embed.FS
 var ninetyDaysXML embed.FS
 
 func TestFetchDailyCSV(t *testing.T) {
-	reader, err := Fetch(DailyCSV)
+	reader, err := utilities.Fetch(DailyCSV)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	files, err := Unzip(reader)
+	files, err := utilities.Unzip(reader)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -46,7 +47,7 @@ func TestFetchDailyCSV(t *testing.T) {
 }
 
 func TestFetchDailyXML(t *testing.T) {
-	reader, err := Fetch(DailyXML)
+	reader, err := utilities.Fetch(DailyXML)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -65,7 +66,7 @@ func TestParseDailyCSV(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	defer zipFile.Close()
-	csvFiles, err := Unzip(zipFile)
+	csvFiles, err := utilities.Unzip(zipFile)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -86,7 +87,7 @@ func TestParseHistoricalCSV(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	defer zipFile.Close()
-	csvFiles, err := Unzip(zipFile)
+	csvFiles, err := utilities.Unzip(zipFile)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
