@@ -9,12 +9,23 @@ import (
 )
 
 type (
+	// Wrap a float64 in a struct which specifies the number of digits to emit
+	// for its fractional part when converting to a string or marshaling JSON.
+	//
+	// This type's methods only affect how the underlying floatint-point value
+	// is represented in text-based formats. It does not alter the mathematical
+	// precision of monetary values nor perform any scaling based on the
+	// denominations of particular currencies. For example, the appropriate
+	// number of digits to use for USD, CAD, GBP, EUR etc. is 2. The appropriate
+	// number of digits to use for JPY is 0. 100 JPY would be represented by the
+	// float64 value 100.0.
 	Money struct {
 		value  float64
 		digits int
 	}
 )
 
+// Create a Money structure initialized to the given values.
 func New(value float64, digits int) Money {
 	if digits < 0 {
 		digits = 0
@@ -25,12 +36,18 @@ func New(value float64, digits int) Money {
 	}
 }
 
+// Return the JSON representation of m and nil.
 func (m Money) MarshalJSON() ([]byte, error) {
 	return []byte(m.String()), nil
 }
 
+// Set m's value to the float64 represented by the given fmt.ScanState.
+//
+// Returns nil if m's value was successfully parsed, an error if parsing the
+// contents of the given fmt.ScanState as a float64 fails. The value of m is
+// left unchanged if error is non-nil.
 func (m *Money) Scan(state fmt.ScanState, _ rune) error {
-	token, err := state.Token(true, m.tokenizer())
+	token, err := state.Token(true, m.makeTokenizer())
 	if err != nil {
 		return err
 	}
@@ -42,11 +59,18 @@ func (m *Money) Scan(state fmt.ScanState, _ rune) error {
 	return nil
 }
 
+// Return the string representation of m's value.
 func (m Money) String() string {
 	f := "%." + strconv.Itoa(m.digits) + "f"
 	return fmt.Sprintf(f, m.Value())
 }
 
+// Set m's value to the result of converting the given sequence of bytes to a
+// float64.
+//
+// Returns nil if m's value was successfully parsed, an error if parsing the
+// contents of the given sequence of bytes as a float64 fails. The value of m is
+// left unchanged if error is non-nil.
 func (m *Money) UnmarshalJSON(b []byte) error {
 	var f float64
 	_, err := fmt.Sscan(string(b), &f)
@@ -56,11 +80,14 @@ func (m *Money) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+// Return the numeric value of m.
 func (m Money) Value() float64 {
 	return m.value
 }
 
-func (m Money) tokenizer() func(rune) bool {
+// Create a function for use by Money's Scan() method to tokenize a
+// floating-point value.
+func (m Money) makeTokenizer() func(rune) bool {
 	firstRune := true
 	decimalPointSeen := false
 	return func(r rune) bool {
