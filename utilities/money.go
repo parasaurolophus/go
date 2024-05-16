@@ -3,6 +3,7 @@
 package utilities
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"unicode"
@@ -19,7 +20,16 @@ type (
 	// number of digits to use for USD, CAD, GBP, EUR etc. is 2. The appropriate
 	// number of digits to use for JPY is 0. 100 JPY would be represented by the
 	// float64 value 100.0.
-	Money struct {
+	Money interface {
+		fmt.Scanner
+		fmt.Stringer
+		json.Marshaler
+		json.Unmarshaler
+		Value() float64
+	}
+
+	// Implementation of Money interface.
+	money struct {
 		value  float64
 		digits int
 	}
@@ -30,14 +40,14 @@ func New(value float64, digits int) Money {
 	if digits < 0 {
 		digits = 0
 	}
-	return Money{
+	return &money{
 		value:  value,
 		digits: digits,
 	}
 }
 
 // Return the JSON representation of m and nil.
-func (m Money) MarshalJSON() ([]byte, error) {
+func (m money) MarshalJSON() ([]byte, error) {
 	return []byte(m.String()), nil
 }
 
@@ -46,7 +56,7 @@ func (m Money) MarshalJSON() ([]byte, error) {
 // Returns nil if m's value was successfully parsed, an error if parsing the
 // contents of the given fmt.ScanState as a float64 fails. The value of m is
 // left unchanged if error is non-nil.
-func (m *Money) Scan(state fmt.ScanState, _ rune) error {
+func (m *money) Scan(state fmt.ScanState, _ rune) error {
 	token, err := state.Token(true, m.makeTokenizer())
 	if err != nil {
 		return err
@@ -60,7 +70,7 @@ func (m *Money) Scan(state fmt.ScanState, _ rune) error {
 }
 
 // Return the string representation of m's value.
-func (m Money) String() string {
+func (m money) String() string {
 	f := "%." + strconv.Itoa(m.digits) + "f"
 	return fmt.Sprintf(f, m.Value())
 }
@@ -71,7 +81,7 @@ func (m Money) String() string {
 // Returns nil if m's value was successfully parsed, an error if parsing the
 // contents of the given sequence of bytes as a float64 fails. The value of m is
 // left unchanged if error is non-nil.
-func (m *Money) UnmarshalJSON(b []byte) error {
+func (m *money) UnmarshalJSON(b []byte) error {
 	var f float64
 	_, err := fmt.Sscan(string(b), &f)
 	if err == nil {
@@ -81,13 +91,13 @@ func (m *Money) UnmarshalJSON(b []byte) error {
 }
 
 // Return the numeric value of m.
-func (m Money) Value() float64 {
+func (m money) Value() float64 {
 	return m.value
 }
 
 // Create a function for use by Money's Scan() method to tokenize a
 // floating-point value.
-func (m Money) makeTokenizer() func(rune) bool {
+func (m money) makeTokenizer() func(rune) bool {
 	firstRune := true
 	decimalPointSeen := false
 	return func(r rune) bool {
