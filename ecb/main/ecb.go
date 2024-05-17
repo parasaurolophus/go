@@ -24,9 +24,9 @@ func main() {
 		parser = ecb.ParseCSV
 		switch *version {
 		case "daily":
-			url = ecb.DailyCSV
+			url = ecb.DAILY_CSV_URL
 		case "historical":
-			url = ecb.HistoricalCSV
+			url = ecb.HISTORICAL_CSV_URL
 		default:
 			fmt.Fprintf(os.Stderr, `"%s" is not a valid version for csv\n`, *version)
 			flag.Usage()
@@ -36,11 +36,11 @@ func main() {
 		parser = ecb.ParseXML
 		switch *version {
 		case "daily":
-			url = ecb.DailyXML
+			url = ecb.DAILY_XML_URL
 		case "historical":
-			url = ecb.HistoricalXML
+			url = ecb.HISTORICAL_XML_URL
 		case "ninety":
-			url = ecb.NinetyDayXML
+			url = ecb.NINETY_DAY_XML_URL
 		default:
 			fmt.Fprintf(os.Stderr, `"%s" is not a valid version for csv\n`, *version)
 			flag.Usage()

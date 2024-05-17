@@ -1,16 +1,13 @@
 package utilities
 
 import (
-	"embed"
 	"encoding/csv"
+	"parasaurolophus/go/common_test"
 	"testing"
 )
 
-//go:embed testdata
-var testData embed.FS
-
 func TestUnzip(t *testing.T) {
-	archive, err := testData.Open("testdata/eurofxref.zip")
+	archive, err := common_test.TestData.Open("testdata/eurofxref.zip")
 	if err != nil {
 		t.Fatal(err.Error())
 	}

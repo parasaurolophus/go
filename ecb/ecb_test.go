@@ -3,28 +3,13 @@
 package ecb
 
 import (
-	"embed"
+	"parasaurolophus/go/common_test"
 	"parasaurolophus/go/utilities"
 	"testing"
 )
 
-//go:embed testdata/eurofxref.zip
-var dailyZip embed.FS
-
-//go:embed testdata/eurofxref-daily.xml
-var dailyXML embed.FS
-
-//go:embed testdata/eurofxref-hist.xml
-var historicalXml embed.FS
-
-//go:embed testdata/eurofxref-hist.zip
-var historicalZip embed.FS
-
-//go:embed testdata/eurofxref-hist-90d.xml
-var ninetyDaysXML embed.FS
-
 func TestFetchDailyCSV(t *testing.T) {
-	reader, err := utilities.Fetch(DailyCSV)
+	reader, err := utilities.Fetch(DAILY_CSV_URL)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -47,7 +32,7 @@ func TestFetchDailyCSV(t *testing.T) {
 }
 
 func TestFetchDailyXML(t *testing.T) {
-	reader, err := utilities.Fetch(DailyXML)
+	reader, err := utilities.Fetch(DAILY_XML_URL)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -61,7 +46,7 @@ func TestFetchDailyXML(t *testing.T) {
 }
 
 func TestParseDailyCSV(t *testing.T) {
-	zipFile, err := dailyZip.Open("testdata/eurofxref.zip")
+	zipFile, err := common_test.TestData.Open("testdata/eurofxref.zip")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -82,7 +67,7 @@ func TestParseDailyCSV(t *testing.T) {
 }
 
 func TestParseHistoricalCSV(t *testing.T) {
-	zipFile, err := historicalZip.Open("testdata/eurofxref-hist.zip")
+	zipFile, err := common_test.TestData.Open("testdata/eurofxref-hist.zip")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -103,7 +88,7 @@ func TestParseHistoricalCSV(t *testing.T) {
 }
 
 func TestParseDailyXML(t *testing.T) {
-	xmlFile, err := dailyXML.Open("testdata/eurofxref-daily.xml")
+	xmlFile, err := common_test.TestData.Open("testdata/eurofxref-daily.xml")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -118,7 +103,7 @@ func TestParseDailyXML(t *testing.T) {
 }
 
 func TestParseHistoricalXML(t *testing.T) {
-	xmlFile, err := historicalXml.Open("testdata/eurofxref-hist.xml")
+	xmlFile, err := common_test.TestData.Open("testdata/eurofxref-hist.xml")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -133,7 +118,7 @@ func TestParseHistoricalXML(t *testing.T) {
 }
 
 func TestParseNinetyDayXML(t *testing.T) {
-	xmlFile, err := ninetyDaysXML.Open("testdata/eurofxref-hist-90d.xml")
+	xmlFile, err := common_test.TestData.Open("testdata/eurofxref-hist-90d.xml")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
