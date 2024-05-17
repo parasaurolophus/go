@@ -3,39 +3,59 @@
 package utilities
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
-	"time"
+	"parasaurolophus/go/logging"
+	"parasaurolophus/go/stacktraces"
 )
 
 // Invoke the given function asynchronously for each value sent to the given
 // input channel, sending the result to the given output channel.
 func Async[T any](f func(T) T, in chan T, out chan T) {
-
 	defer close(out)
-
+	options := logging.LoggerOptions{
+		BaseTags: []string{"utilities.Async", logging.PANIC},
+	}
+	logger := logging.New(os.Stderr, &options)
 	invoke := func(arg T) {
-
 		defer func() {
 			if r := recover(); r != nil {
-				message := map[string]any{
-					"msg":       fmt.Sprintf("recovered from panic in injected dependency: %v", r),
-					"time":      time.Now().Format(time.RFC3339),
-					"verbosity": "ALWAYS",
-					"recovered": r,
-					"tags":      []string{"utilities.Async", "PANIC"},
-				}
-				b, _ := json.Marshal(message)
-				fmt.Fprintln(os.Stderr, string(b))
+				logger.Always(
+					func() string {
+						return fmt.Sprintf("recovered from panic in injected dependency: %v", r)
+					})
 			}
 		}()
 		out <- f(arg)
 	}
-
 	for arg := range in {
 		invoke(arg)
 	}
+}
+
+// Return the result of invoking the given list of functions. The first function
+// is applied to the given value. The second to the result returned by the
+// first, and so on. The final value and nil is returned by Compose if all
+// functions execute successfully. The last successful value and an error are
+// returned for the first function that panics.
+func Compose[T any](value T, functions ...func(T) T) (T, error) {
+	var err error
+	invoke := func(f func(T) T, p T) T {
+		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("panic: %v: %s", r, stacktraces.ShortStackTrace(nil))
+			}
+		}()
+		return f(p)
+	}
+	for _, fn := range functions {
+		v := invoke(fn, value)
+		if err != nil {
+			return value, err
+		}
+		value = v
+	}
+	return value, err
 }
 
 // Return a new slice containing the results of applying the specified function
@@ -49,17 +69,4 @@ func Map[T any](f func(T) T, slice []T) []T {
 	}
 
 	return result
-}
-
-// Apply the first of the given functions to the specified value, then the
-// second to the result from the first, and so on. Return the result of the last
-// invocation.
-func Reduce[T any](value T, functions ...func(T) T) T {
-
-	for _, f := range functions {
-
-		value = f(value)
-	}
-
-	return value
 }

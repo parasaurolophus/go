@@ -2,7 +2,10 @@
 
 package utilities
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestAsync(t *testing.T) {
 
@@ -55,6 +58,27 @@ func TestAsync(t *testing.T) {
 	}
 }
 
+func TestCompose(t *testing.T) {
+	adder := func(n int) int { return n + 1 }
+	subtracter := func(n int) int { return n - 1 }
+	result, err := Compose(0, adder, adder, subtracter, adder)
+	if err != nil {
+		t.Error(err.Error())
+	}
+	if result != 2 {
+		t.Errorf("expected 2, got %d", result)
+	}
+	panicer := func(n int) int { panic("deliberate") }
+	result, err = Compose(0, adder, adder, panicer, adder)
+	if err == nil {
+		t.Error("expected err to be non-nil")
+	}
+	fmt.Println(err.Error())
+	if result != 2 {
+		t.Errorf("expected 2, got %d", result)
+	}
+}
+
 func TestMap(t *testing.T) {
 
 	slice := []int{0, 1, 2}
@@ -75,16 +99,5 @@ func TestMap(t *testing.T) {
 
 	if result[2] != 3 {
 		t.Errorf("expected 3, got %d", result[2])
-	}
-}
-
-func TestReduce(t *testing.T) {
-
-	adder := func(n int) int { return n + 1 }
-	subtracter := func(n int) int { return n - 1 }
-	result := Reduce(0, adder, adder, subtracter, adder)
-
-	if result != 2 {
-		t.Errorf("expected 2, got %d", result)
 	}
 }

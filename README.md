@@ -21,24 +21,18 @@ This repository is organized as a Go module with six packages:
 * [common_test](./common_test/) defines features available to unit tests for all
   of these packages, for example embedded test files
 
-* [example](./example) defines a stand-alone executable (a `main()` function in
-  package `main`) that demonstrates the use of these packages
+* [ecb](./ecb/) contains a package for experiments involving the European
+  Central Bank's exchange data feeds
 
 ```mermaid
 graph TB
 
-
-  utilities --> |unit\ntests| common_test
   ecb --> |unit\ntests| common_test
+  utilities --> |unit\ntests| common_test
+  utilities --> logging
 
-  example --> logging
   logging --> stacktraces
   logging -->|unit\ntests| stacktraces_test
 
-  example --> stacktraces
   stacktraces --> |unit\ntests| stacktraces_test
 ```
-
-See [example/README.md](./example/README.md),
-[logging/README.md](./logging/README.md) and
-[stacktraces/README.md](./stacktraces/README.md) for more information.
