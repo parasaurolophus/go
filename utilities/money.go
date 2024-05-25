@@ -106,11 +106,8 @@ func (m money) makeTokenizer() func(rune) bool {
 			return firstRune
 		}
 		if r == '.' {
-			if decimalPointSeen {
-				return false
-			}
-			decimalPointSeen = true
-			return true
+			defer func() { decimalPointSeen = true }()
+			return !decimalPointSeen
 		}
 		return unicode.IsDigit(r)
 	}
