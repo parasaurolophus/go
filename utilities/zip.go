@@ -1,43 +1,54 @@
+// Copyright Kirk Rader 2024
+
 package utilities
 
 import (
 	"archive/zip"
-	"bytes"
 	"io"
+	"os"
 )
 
-// Return an io.ReadCloser list, one for each entry in the given zip archive.
-//
-// Warning: The zip.NewReader() constructor requires an io.ReaderAt which is
-// incompatible with http.Response.Body() and so, as a work-around, we buffer
-// the entire input in memory. Plan accordingly when provisioning to run this
-// code as a service!
-func Unzip(reader io.ReadCloser) ([]io.ReadCloser, error) {
-	defer reader.Close()
-	///////////////////////////////////////////////////////////////////////////
-	// TODO: investigate better ways to do this than to read the entire input
-	// file into memory (but there may not be given the design defects in the
-	// standard zip library)
-	buffer, err := io.ReadAll(reader)
+// Type of function used to process each entry in a zip archive.
+type ZipHandler func(entry *zip.File)
+
+// Apply the given handler to each entry in the given zip file.
+func ForEachZipEntry(handler ZipHandler, archive io.ReaderAt, size int64) error {
+	zip, err := zip.NewReader(archive, size)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	bufferReader := bytes.NewReader(buffer)
-	///////////////////////////////////////////////////////////////////////////
-	z, err := zip.NewReader(bufferReader, int64(len(buffer)))
+	for _, entry := range zip.File {
+		handler(entry)
+	}
+	return nil
+}
+
+// Apply the given handler to each entry in the given zip archive.
+func ForZipFile(handler ZipHandler, archiveFile *os.File) error {
+	info, err := archiveFile.Stat()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	result := []io.ReadCloser{}
-	for _, f := range z.File {
-		contents, err := f.Open()
-		if err != nil {
-			for _, rc := range result {
-				rc.Close()
-			}
-			return nil, err
-		}
-		result = append(result, contents)
+	return ForEachZipEntry(handler, archiveFile, info.Size())
+}
+
+// Apply the given handler to the each entry in the given zip archive.
+func ForZipReader(handler ZipHandler, archiveReader io.Reader) error {
+	tempFile, err := os.CreateTemp(os.TempDir(), "ForZipReader")
+	if err != nil {
+		return err
 	}
-	return result, nil
+	defer func() {
+		tempFile.Close()
+		os.Remove(tempFile.Name())
+	}()
+	_, err = io.Copy(tempFile, archiveReader)
+	if err != nil {
+		return err
+	}
+	_, err = tempFile.Seek(0, 0)
+	if err != nil {
+		return err
+	}
+	return ForZipFile(handler, tempFile)
 }

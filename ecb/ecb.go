@@ -74,8 +74,7 @@ const (
 )
 
 // Parse the ECB CSV data from the given reader.
-func ParseCSV(readCloser io.ReadCloser) (Data, error) {
-	defer readCloser.Close()
+func ParseCSV(readCloser io.Reader) (Data, error) {
 	timestamp := time.Now().Unix()
 	csvReader := csv.NewReader(readCloser)
 	headers, err := csvReader.Read()
@@ -87,13 +86,16 @@ func ParseCSV(readCloser io.ReadCloser) (Data, error) {
 	}
 	dateIndex := slices.Index(headers, "Date")
 	if dateIndex < 0 {
-		return nil, fmt.Errorf("Date header not found")
+		return nil, fmt.Errorf("date header not found")
 	}
 	data := Data{}
 	for {
 		record, err := csvReader.Read()
 		if err == io.EOF {
 			break
+		}
+		if err != nil {
+			return nil, err
 		}
 		columns, err := parseRecordCSV(timestamp, dateIndex, headers, record)
 		if err != nil {
@@ -106,8 +108,7 @@ func ParseCSV(readCloser io.ReadCloser) (Data, error) {
 }
 
 // Parse the ECB XML data from the given reader.
-func ParseXML(readCloser io.ReadCloser) (Data, error) {
-	defer readCloser.Close()
+func ParseXML(reader io.Reader) (Data, error) {
 	timestamp := time.Now().Unix()
 	type (
 		rateCube struct {
@@ -130,7 +131,7 @@ func ParseXML(readCloser io.ReadCloser) (Data, error) {
 			WrapperCube wrapperCube `xml:"Cube"`
 		}
 	)
-	decoder := xml.NewDecoder(readCloser)
+	decoder := xml.NewDecoder(reader)
 	var doc document
 	err := decoder.Decode(&doc)
 	if err != nil {

@@ -3,40 +3,44 @@
 package ecb
 
 import (
+	"archive/zip"
 	"parasaurolophus/go/common_test"
 	"parasaurolophus/go/utilities"
 	"testing"
 )
 
 func TestFetchDailyCSV(t *testing.T) {
-	reader, err := utilities.Fetch(DAILY_CSV_URL)
+	readCloser, err := utilities.Fetch(DAILY_CSV_URL)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	files, err := utilities.Unzip(reader)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	if len(files) == 0 {
-		t.Fatal("empty zip file")
-	}
-	for _, file := range files {
+	defer readCloser.Close()
+	handler := func(entry *zip.File) {
+		file, err := entry.Open()
+		if err != nil {
+			t.Fatal(err.Error())
+		}
 		data, err := ParseCSV(file)
 		if err != nil {
-			t.Error(err.Error())
+			t.Fatal(err.Error())
 		}
 		if len(data) == 0 {
 			t.Error("empty CSV file")
 		}
 	}
-}
-
-func TestFetchDailyXML(t *testing.T) {
-	reader, err := utilities.Fetch(DAILY_XML_URL)
+	err = utilities.ForZipReader(handler, readCloser)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	data, err := ParseXML(reader)
+}
+
+func TestFetchDailyXML(t *testing.T) {
+	readCloser, err := utilities.Fetch(DAILY_XML_URL)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	defer readCloser.Close()
+	data, err := ParseXML(readCloser)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -51,18 +55,22 @@ func TestParseDailyCSV(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	defer zipFile.Close()
-	csvFiles, err := utilities.Unzip(zipFile)
+	handler := func(entry *zip.File) {
+		file, err := entry.Open()
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+		data, err := ParseCSV(file)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+		if len(data) == 0 {
+			t.Error("empty CSV file")
+		}
+	}
+	err = utilities.ForZipReader(handler, zipFile)
 	if err != nil {
 		t.Fatal(err.Error())
-	}
-	for _, csvFile := range csvFiles {
-		data, err := ParseCSV(csvFile)
-		if err != nil {
-			t.Error(err.Error())
-		}
-		if len(data) < 1 {
-			t.Errorf("no data returned")
-		}
 	}
 }
 
@@ -72,18 +80,22 @@ func TestParseHistoricalCSV(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	defer zipFile.Close()
-	csvFiles, err := utilities.Unzip(zipFile)
+	handler := func(entry *zip.File) {
+		file, err := entry.Open()
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+		data, err := ParseCSV(file)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+		if len(data) == 0 {
+			t.Error("empty CSV file")
+		}
+	}
+	err = utilities.ForZipReader(handler, zipFile)
 	if err != nil {
 		t.Fatal(err.Error())
-	}
-	for _, csvFile := range csvFiles {
-		data, err := ParseCSV(csvFile)
-		if err != nil {
-			t.Error(err.Error())
-		}
-		if len(data) < 1 {
-			t.Errorf("no data returned")
-		}
 	}
 }
 
