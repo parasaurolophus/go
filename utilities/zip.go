@@ -24,31 +24,30 @@ func ForEachZipEntry(handler ZipHandler, archive io.ReaderAt, size int64) error 
 }
 
 // Apply the given handler to each entry in the given zip archive.
-func ForZipFile(handler ZipHandler, archiveFile *os.File) error {
-	info, err := archiveFile.Stat()
+func ForZipFile(handler ZipHandler, file *os.File) error {
+	info, err := file.Stat()
 	if err != nil {
 		return err
 	}
-	return ForEachZipEntry(handler, archiveFile, info.Size())
+	return ForEachZipEntry(handler, file, info.Size())
 }
 
-// Apply the given handler to the each entry in the given zip archive.
-func ForZipReader(handler ZipHandler, archiveReader io.Reader) error {
-	tempFile, err := os.CreateTemp(os.TempDir(), "ForZipReader")
+// Apply the given handler to each entry in the given zip archive.
+func ForZipReader(handler ZipHandler, reader io.Reader) error {
+	file, err := os.CreateTemp(os.TempDir(), "ForZipReader")
 	if err != nil {
 		return err
 	}
-	defer func() {
-		tempFile.Close()
-		os.Remove(tempFile.Name())
-	}()
-	_, err = io.Copy(tempFile, archiveReader)
+	// deferred functions are invoked in reverse order
+	defer os.Remove(file.Name()) // invoked second
+	defer file.Close()           // invoked first
+	_, err = io.Copy(file, reader)
 	if err != nil {
 		return err
 	}
-	_, err = tempFile.Seek(0, 0)
+	_, err = file.Seek(0, 0)
 	if err != nil {
 		return err
 	}
-	return ForZipFile(handler, tempFile)
+	return ForZipFile(handler, file)
 }

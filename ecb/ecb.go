@@ -10,7 +10,6 @@ import (
 	"io"
 	"slices"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -74,15 +73,13 @@ const (
 )
 
 // Parse the ECB CSV data from the given reader.
-func ParseCSV(readCloser io.Reader) (Data, error) {
+func ParseCSV(reader io.Reader) (Data, error) {
 	timestamp := time.Now().Unix()
-	csvReader := csv.NewReader(readCloser)
+	csvReader := csv.NewReader(reader)
+	csvReader.TrimLeadingSpace = true
 	headers, err := csvReader.Read()
 	if err != nil {
 		return nil, err
-	}
-	for index, h := range headers {
-		headers[index] = strings.Trim(h, " ")
 	}
 	dateIndex := slices.Index(headers, "Date")
 	if dateIndex < 0 {
@@ -186,20 +183,22 @@ func parseRecordCSV(timestamp int64, dateIndex int, headers, record []string) (D
 	data := Data{}
 	for index, header := range headers {
 		if index == dateIndex {
+			// date column is handled by the caller of this function
 			continue
 		}
 		if len(header) < 1 {
+			// ECB's questionable CSV format combined with deficiencies in Go's
+			// CSV parser results in spurious, empty columns in each row
 			continue
 		}
-		value := strings.Trim(record[index], " ")
 		var datum Datum
 		datum.Timestamp = timestamp
-		t, err := normalizeTime(strings.Trim(record[dateIndex], " "))
+		t, err := normalizeTime(record[dateIndex])
 		if err != nil {
 			return nil, err
 		}
 		datum.Date = t
-		f, err := strconv.ParseFloat(value, 64)
+		f, err := strconv.ParseFloat(record[index], 64)
 		// ignore rates that can't be parsed since many columns contain "N/A"
 		if err != nil {
 			continue

@@ -12,24 +12,23 @@ import (
 )
 
 func TestForZipFile(t *testing.T) {
-	archive, err := common_test.TestData.Open("testdata/eurofxref.zip")
+	embedded, err := common_test.TestData.Open("testdata/eurofxref.zip")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	defer archive.Close()
-	tempFile, err := os.CreateTemp(t.TempDir(), "TestForZipFile")
+	defer embedded.Close()
+	file, err := os.CreateTemp(t.TempDir(), "TestForZipFile")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	defer func() {
-		tempFile.Close()
-		os.Remove(tempFile.Name())
-	}()
-	_, err = io.Copy(tempFile, archive)
+	// deferred functions are invoked in reverse order
+	defer os.Remove(file.Name()) // invoked second
+	defer file.Close()           // invoked first
+	_, err = io.Copy(file, embedded)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
-	_, err = tempFile.Seek(0, 0)
+	_, err = file.Seek(0, 0)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -51,7 +50,7 @@ func TestForZipFile(t *testing.T) {
 		}
 		totalSize += len(b)
 	}
-	err = ForZipFile(handler, tempFile)
+	err = ForZipFile(handler, file)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -63,11 +62,12 @@ func TestForZipFile(t *testing.T) {
 	}
 }
 
-func TestForZipReadCloser(t *testing.T) {
-	archive, err := common_test.TestData.Open("testdata/eurofxref.zip")
+func TestForZipReader(t *testing.T) {
+	embedded, err := common_test.TestData.Open("testdata/eurofxref.zip")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
+	defer embedded.Close()
 	entryCount := 0
 	totalSize := 0
 	handler := func(entry *zip.File) {
@@ -86,8 +86,7 @@ func TestForZipReadCloser(t *testing.T) {
 		}
 		totalSize += len(b)
 	}
-	defer archive.Close()
-	err = ForZipReader(handler, archive)
+	err = ForZipReader(handler, embedded)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
