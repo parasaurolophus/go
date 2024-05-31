@@ -17,12 +17,13 @@ func TestForCSVReader(t *testing.T) {
 	initialized := false
 	zipCount := 0
 	rowCount := 0
-	headersHandler := func(headers []string) []string {
+	headersHandler := func(headers []string) ([]string, error) {
 		initialized = true
-		return headers
+		return headers, nil
 	}
-	rowHandler := func(headers, columns []string) {
+	rowHandler := func(headers, columns []string) error {
 		rowCount += 1
+		return nil
 	}
 	zipHandler := func(entry *zip.File) {
 		reader, zipErr := entry.Open()

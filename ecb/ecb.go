@@ -4,10 +4,10 @@ package ecb
 
 import (
 	"cmp"
-	"encoding/csv"
 	"encoding/xml"
 	"fmt"
 	"io"
+	"parasaurolophus/go/utilities"
 	"slices"
 	"strconv"
 	"time"
@@ -74,31 +74,28 @@ const (
 
 // Parse the ECB CSV data from the given reader.
 func ParseCSV(reader io.Reader) (Data, error) {
+	data := Data{}
 	timestamp := time.Now().Unix()
-	csvReader := csv.NewReader(reader)
-	csvReader.TrimLeadingSpace = true
-	headers, err := csvReader.Read()
+	dateIndex := 0
+	headersHandler := func(headers []string) ([]string, error) {
+		dateIndex = slices.Index(headers, "Date")
+		if dateIndex < 0 {
+			return headers, fmt.Errorf("date header not found")
+		}
+		return headers, nil
+	}
+	rowHandler := func(headers, columns []string) error {
+		var d Data
+		d, err := parseRecordCSV(timestamp, dateIndex, headers, columns)
+		if err != nil {
+			return err
+		}
+		data = append(data, d...)
+		return nil
+	}
+	err := utilities.ForCSVReader(headersHandler, rowHandler, reader)
 	if err != nil {
 		return nil, err
-	}
-	dateIndex := slices.Index(headers, "Date")
-	if dateIndex < 0 {
-		return nil, fmt.Errorf("date header not found")
-	}
-	data := Data{}
-	for {
-		record, err := csvReader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-		columns, err := parseRecordCSV(timestamp, dateIndex, headers, record)
-		if err != nil {
-			return nil, err
-		}
-		data = append(data, columns...)
 	}
 	slices.SortFunc(data, comparer)
 	return data, nil
