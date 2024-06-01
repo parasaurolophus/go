@@ -9,16 +9,19 @@ import (
 )
 
 // Type of function used to process each entry in a zip archive.
-type ZipHandler func(entry *zip.File)
+type ZipHandler func(*zip.File) error
 
 // Apply the given handler to each entry in the given zip file.
-func ForEachZipEntry(handler ZipHandler, archive io.ReaderAt, size int64) error {
-	zip, err := zip.NewReader(archive, size)
+func ForEachZipEntry(handler ZipHandler, readerAt io.ReaderAt, size int64) error {
+	zipReader, err := zip.NewReader(readerAt, size)
 	if err != nil {
 		return err
 	}
-	for _, entry := range zip.File {
-		handler(entry)
+	for _, entry := range zipReader.File {
+		err = handler(entry)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

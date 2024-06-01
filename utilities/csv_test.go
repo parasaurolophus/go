@@ -25,17 +25,15 @@ func TestForCSVReader(t *testing.T) {
 		rowCount += 1
 		return nil
 	}
-	zipHandler := func(entry *zip.File) {
-		reader, zipErr := entry.Open()
-		if zipErr != nil {
-			t.Fatal(zipErr.Error())
+	zipHandler := func(entry *zip.File) (err error) {
+		reader, err := entry.Open()
+		if err != nil {
+			return
 		}
 		defer reader.Close()
 		zipCount += 1
-		csvErr := ForCSVReader(headersHandler, rowHandler, reader)
-		if csvErr != nil {
-			t.Fatal(csvErr.Error())
-		}
+		err = ForCSVReader(headersHandler, rowHandler, reader)
+		return
 	}
 	err = ForZipReader(zipHandler, embedded)
 	if err != nil {

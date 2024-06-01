@@ -4,6 +4,7 @@ package ecb
 
 import (
 	"archive/zip"
+	"fmt"
 	"parasaurolophus/go/common_test"
 	"parasaurolophus/go/utilities"
 	"testing"
@@ -15,7 +16,7 @@ func TestFetchDailyCSV(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	defer readCloser.Close()
-	handler := func(entry *zip.File) {
+	handler := func(entry *zip.File) (err error) {
 		file, err := entry.Open()
 		if err != nil {
 			t.Fatal(err.Error())
@@ -27,6 +28,7 @@ func TestFetchDailyCSV(t *testing.T) {
 		if len(data) == 0 {
 			t.Error("empty CSV file")
 		}
+		return
 	}
 	err = utilities.ForZipReader(handler, readCloser)
 	if err != nil {
@@ -55,18 +57,19 @@ func TestParseDailyCSV(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	defer zipFile.Close()
-	handler := func(entry *zip.File) {
+	handler := func(entry *zip.File) (err error) {
 		file, err := entry.Open()
 		if err != nil {
-			t.Fatal(err.Error())
+			return
 		}
 		data, err := ParseCSV(file)
 		if err != nil {
-			t.Fatal(err.Error())
+			return
 		}
 		if len(data) == 0 {
-			t.Error("empty CSV file")
+			err = fmt.Errorf("empty CSV file")
 		}
+		return
 	}
 	err = utilities.ForZipReader(handler, zipFile)
 	if err != nil {
@@ -80,18 +83,19 @@ func TestParseHistoricalCSV(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	defer zipFile.Close()
-	handler := func(entry *zip.File) {
+	handler := func(entry *zip.File) (err error) {
 		file, err := entry.Open()
 		if err != nil {
-			t.Fatal(err.Error())
+			return
 		}
 		data, err := ParseCSV(file)
 		if err != nil {
-			t.Fatal(err.Error())
+			return
 		}
 		if len(data) == 0 {
-			t.Error("empty CSV file")
+			err = fmt.Errorf("empty CSV file")
 		}
+		return
 	}
 	err = utilities.ForZipReader(handler, zipFile)
 	if err != nil {

@@ -40,7 +40,7 @@ func raw(reader io.Reader) {
 }
 
 func csvHandler(parse bool) utilities.ZipHandler {
-	return func(entry *zip.File) {
+	return func(entry *zip.File) (err error) {
 		readCloser, err := entry.Open()
 		if err != nil {
 			panic(err.Error())
@@ -55,6 +55,7 @@ func csvHandler(parse bool) utilities.ZipHandler {
 		} else {
 			raw(readCloser)
 		}
+		return
 	}
 }
 

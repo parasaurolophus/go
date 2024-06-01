@@ -34,21 +34,22 @@ func TestForZipFile(t *testing.T) {
 	}
 	entryCount := 0
 	totalSize := 0
-	handler := func(entry *zip.File) {
+	handler := func(entry *zip.File) (err error) {
 		if strings.HasSuffix(entry.Name, "/") {
 			t.Fatalf("unsupported entry type %s", entry.Name)
 		}
 		reader, err := entry.Open()
 		if err != nil {
-			t.Fatal(err.Error())
+			return
 		}
 		defer reader.Close()
 		entryCount += 1
 		b, err := io.ReadAll(reader)
 		if err != nil {
-			t.Fatal(err.Error())
+			return
 		}
 		totalSize += len(b)
+		return
 	}
 	err = ForZipFile(handler, file)
 	if err != nil {
@@ -70,21 +71,22 @@ func TestForZipReader(t *testing.T) {
 	defer embedded.Close()
 	entryCount := 0
 	totalSize := 0
-	handler := func(entry *zip.File) {
+	handler := func(entry *zip.File) (err error) {
 		if strings.HasSuffix(entry.Name, "/") {
 			t.Fatalf("unsupported entry type %s", entry.Name)
 		}
 		reader, err := entry.Open()
 		if err != nil {
-			t.Fatal(err.Error())
+			return
 		}
 		defer reader.Close()
 		entryCount += 1
 		b, err := io.ReadAll(reader)
 		if err != nil {
-			t.Fatal(err.Error())
+			return
 		}
 		totalSize += len(b)
+		return
 	}
 	err = ForZipReader(handler, embedded)
 	if err != nil {
