@@ -57,7 +57,22 @@ func (m money) MarshalJSON() ([]byte, error) {
 // contents of the given fmt.ScanState as a float64 fails. The value of m is
 // left unchanged if error is non-nil.
 func (m *money) Scan(state fmt.ScanState, _ rune) error {
-	token, err := state.Token(true, m.makeTokenizer())
+	makeTokenizer := func() func(rune) bool {
+		firstRune := true
+		decimalPointSeen := false
+		return func(r rune) bool {
+			defer func() { firstRune = false }()
+			if r == '-' {
+				return firstRune
+			}
+			if r == '.' {
+				defer func() { decimalPointSeen = true }()
+				return !decimalPointSeen
+			}
+			return unicode.IsDigit(r)
+		}
+	}
+	token, err := state.Token(true, makeTokenizer())
 	if err != nil {
 		return err
 	}
@@ -93,22 +108,4 @@ func (m *money) UnmarshalJSON(b []byte) error {
 // Return the numeric value of m.
 func (m money) Value() float64 {
 	return m.value
-}
-
-// Create a function for use by Money's Scan() method to tokenize a
-// floating-point value.
-func (m money) makeTokenizer() func(rune) bool {
-	firstRune := true
-	decimalPointSeen := false
-	return func(r rune) bool {
-		defer func() { firstRune = false }()
-		if r == '-' {
-			return firstRune
-		}
-		if r == '.' {
-			defer func() { decimalPointSeen = true }()
-			return !decimalPointSeen
-		}
-		return unicode.IsDigit(r)
-	}
 }
