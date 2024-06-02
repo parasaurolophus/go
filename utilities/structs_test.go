@@ -26,10 +26,14 @@ func TestFilterStructFields(t *testing.T) {
 		privateField: 4.2,
 	}
 
-	filteredValue := FilterStructFields(b, "InheritedField", "StringField", "privateField", "InvalidField")
+	filteredValue, err := FilterStructFields(b, "InheritedField", "StringField", "privateField", "InvalidField")
+
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 
 	if filteredValue == nil {
-		t.Errorf("FilterStructFields return nil for a struct")
+		t.Fatal("FilterStructFields return nil for a struct")
 	}
 
 	filtered := filteredValue.(B)
@@ -54,10 +58,14 @@ func TestFilterStructFields(t *testing.T) {
 		t.Errorf("expected 0, got %f", filtered.privateField)
 	}
 
-	filteredValue = FilterStructFields(42)
+	filteredValue, err = FilterStructFields(42)
+
+	if err == nil {
+		t.Errorf("expected err not to be nil")
+	}
 
 	if filteredValue != nil {
 
-		t.Error("expected nil")
+		t.Error("expected filteredValue to be nil")
 	}
 }
