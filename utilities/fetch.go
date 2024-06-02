@@ -7,13 +7,21 @@ import (
 )
 
 // Fetch a document from the given URL.
-func Fetch(url string) (io.ReadCloser, error) {
-	resp, err := http.Get(url)
+func Fetch(url string) (readCloser io.ReadCloser, err error) {
+	response, err := http.Get(url)
+	defer func() {
+		if err != nil && response != nil && response.Body != nil {
+			io.ReadAll(response.Body)
+			response.Body.Close()
+		}
+	}()
 	if err != nil {
-		return nil, err
+		return
 	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("HTTP status %d", resp.StatusCode)
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		err = fmt.Errorf("HTTP status %d", response.StatusCode)
+		return
 	}
-	return resp.Body, nil
+	readCloser = response.Body
+	return
 }
