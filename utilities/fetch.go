@@ -1,3 +1,5 @@
+// Copyright Kirk Rader 2024
+
 package utilities
 
 import (
@@ -11,7 +13,6 @@ func Fetch(url string) (readCloser io.ReadCloser, err error) {
 	response, err := http.Get(url)
 	defer func() {
 		if err != nil && response != nil && response.Body != nil {
-			io.ReadAll(response.Body)
 			response.Body.Close()
 		}
 	}()

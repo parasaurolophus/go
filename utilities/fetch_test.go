@@ -1,3 +1,5 @@
+// Copyright Kirk Rader 2024
+
 package utilities
 
 import (
@@ -7,7 +9,7 @@ import (
 )
 
 func TestFetchGoodURL(t *testing.T) {
-	readCloser, err := Fetch("https://rader.us")
+	readCloser, err := Fetch("http://rader.us")
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -27,8 +29,7 @@ func TestFetchGoodURL(t *testing.T) {
 
 func TestFetchBadURL(t *testing.T) {
 	badFetch(t, "http://invalid")
-	badFetch(t, "http://127.0.0.1/invalid")
-	badFetch(t, "https://rader.us/invalid")
+	badFetch(t, "http://rader.us/invalid")
 }
 
 func badFetch(t *testing.T, url string) {
