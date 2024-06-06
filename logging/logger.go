@@ -22,8 +22,27 @@ type (
 	// given logger.
 	MessageBuilder func() string
 
+	Logger interface {
+		Trace(MessageBuilder, ...any)
+		TraceContext(context.Context, MessageBuilder, ...any)
+		Fine(MessageBuilder, ...any)
+		FineContext(context.Context, MessageBuilder, ...any)
+		Optional(MessageBuilder, ...any)
+		OptionalContext(context.Context, MessageBuilder, ...any)
+		Always(MessageBuilder, ...any)
+		AlwaysContext(context.Context, MessageBuilder, ...any)
+		Enabled(Verbosity) bool
+		EnabledContext(context.Context, Verbosity) bool
+		BaseAttributes() []any
+		SetBaseAttributes(...any)
+		BaseTags() []string
+		SetBaseTags(...string)
+		Verbosity() Verbosity
+		SetVerbosity(Verbosity)
+	}
+
 	// Wrapper for an instance of slog.Logger.
-	Logger struct {
+	logger struct {
 		// This logger's configuration.
 		options LoggerOptions
 		// The wrapped slog.Logger.
@@ -94,115 +113,109 @@ var (
 // be passed by value or reference. Passing by reference allows for cases where
 // each log entry should include the current value for that attribute rather
 // than a copy of the value at the time the Logger was created.
-func New(writer io.Writer, options *LoggerOptions) *Logger {
+func New(writer io.Writer, options *LoggerOptions) Logger {
 
-	logger := new(Logger)
-
+	l := logger{}
 	if options != nil {
-		logger.options = *options
+		l.options = *options
 	}
 
-	if logger.options.Level == nil {
-		logger.options.Level = new(slog.LevelVar)
+	if l.options.Level == nil {
+		l.options.Level = new(slog.LevelVar)
 	}
 
 	handlerOptions := new(slog.HandlerOptions)
 	handlerOptions.AddSource = false
-	handlerOptions.Level = logger.options.Level
-	handlerOptions.ReplaceAttr = newAttrReplacer(logger.options.ReplaceAttr)
-	logger.wrapped = slog.New(slog.NewJSONHandler(writer, handlerOptions))
-	return logger
+	handlerOptions.Level = l.options.Level
+	handlerOptions.ReplaceAttr = newAttrReplacer(l.options.ReplaceAttr)
+	l.wrapped = slog.New(slog.NewJSONHandler(writer, handlerOptions))
+	return &l
 }
 
 // Log at TRACE verbosity.
-func (l *Logger) Trace(message MessageBuilder, attributes ...any) {
+func (l *logger) Trace(message MessageBuilder, attributes ...any) {
 	l.log(defaultContext, TRACE, message, attributes...)
 }
 
 // Log at TRACE verbosity using the supplied context.
-func (l *Logger) TraceContext(ctx context.Context, message MessageBuilder, attributes ...any) {
+func (l *logger) TraceContext(ctx context.Context, message MessageBuilder, attributes ...any) {
 	l.log(ctx, TRACE, message, attributes...)
 }
 
 // Log at FINE verbosity.
-func (l *Logger) Fine(message MessageBuilder, attributes ...any) {
+func (l *logger) Fine(message MessageBuilder, attributes ...any) {
 	l.log(defaultContext, FINE, message, attributes...)
 }
 
 // Log at FINE verbosity using the supplied context.
-func (l *Logger) FineContext(ctx context.Context, message MessageBuilder, attributes ...any) {
+func (l *logger) FineContext(ctx context.Context, message MessageBuilder, attributes ...any) {
 	l.log(ctx, FINE, message, attributes...)
 }
 
 // Log at OPTIONAL verbosity.
-func (l *Logger) Optional(message MessageBuilder, attributes ...any) {
+func (l *logger) Optional(message MessageBuilder, attributes ...any) {
 	l.log(defaultContext, OPTIONAL, message, attributes...)
 }
 
 // Log at OPTIONAL verbosity using the supplied context.
-func (l *Logger) OptionalContext(ctx context.Context, message MessageBuilder, attributes ...any) {
+func (l *logger) OptionalContext(ctx context.Context, message MessageBuilder, attributes ...any) {
 	l.log(ctx, OPTIONAL, message, attributes...)
 }
 
 // Log at ALWAYS verbosity.
-func (l *Logger) Always(message MessageBuilder, attributes ...any) {
+func (l *logger) Always(message MessageBuilder, attributes ...any) {
 	l.log(defaultContext, ALWAYS, message, attributes...)
 }
 
 // Log at ALWAYS verbosity using the supplied context.
-func (l *Logger) AlwaysContext(ctx context.Context, message MessageBuilder, attributes ...any) {
+func (l *logger) AlwaysContext(ctx context.Context, message MessageBuilder, attributes ...any) {
 	l.log(ctx, ALWAYS, message, attributes...)
 }
 
 // Return true or false depending on whether or not the given verbosity is
 // currently enabled for the given logger.
-func (l *Logger) Enabled(verbosity Verbosity) bool {
+func (l *logger) Enabled(verbosity Verbosity) bool {
 	return l.EnabledContext(defaultContext, verbosity)
 }
 
 // Return true or false depending on whether or not the given verbosity is
 // currently enabled for the given logger.
-func (l *Logger) EnabledContext(ctx context.Context, verbosity Verbosity) bool {
+func (l *logger) EnabledContext(ctx context.Context, verbosity Verbosity) bool {
 	return l.wrapped.Enabled(ctx, slog.Level(verbosity))
 }
 
 // Return the current base attributes.
-func (l *Logger) BaseAttributes() []any {
+func (l *logger) BaseAttributes() []any {
 	return l.options.BaseAttributes
 }
 
 // Update the base attributes.
-func (l *Logger) SetBaseAttributes(attributes ...any) {
+func (l *logger) SetBaseAttributes(attributes ...any) {
 	l.options.BaseAttributes = attributes
 }
 
 // Return the current base tags.
-func (l *Logger) BaseTags() []string {
+func (l *logger) BaseTags() []string {
 	return l.options.BaseTags
 }
 
 // Update the base tags.
-func (l *Logger) SetBaseTags(tags ...string) {
+func (l *logger) SetBaseTags(tags ...string) {
 	l.options.BaseTags = tags
 }
 
 // Return the current verbosity
-func (l *Logger) Verbosity() Verbosity {
+func (l *logger) Verbosity() Verbosity {
 	return Verbosity(l.options.Level.Level())
 }
 
 // Update the verbosity
-func (l *Logger) SetVerbosity(verbosity Verbosity) {
+func (l *logger) SetVerbosity(verbosity Verbosity) {
 	l.options.Level.Set(slog.Level(verbosity))
 }
 
-// Stop any asynchronous goroutines associated with this logger.
-func (l *Logger) Stop() {
-	// nothing to do here, but required by Logger interface.
-}
-
 // Implement lazy evaluation of all log entry formatting code.
-func (l *Logger) log(context context.Context, verbosity Verbosity, messageBuilder MessageBuilder, attributes ...any) {
+func (l *logger) log(context context.Context, verbosity Verbosity, messageBuilder MessageBuilder, attributes ...any) {
 
 	if l.wrapped.Enabled(context, slog.Level(verbosity)) {
 
@@ -260,7 +273,7 @@ func (l *Logger) log(context context.Context, verbosity Verbosity, messageBuilde
 }
 
 // Safely invoke injected messageBuilder function.
-func (l *Logger) invokeMessageBuilder(context context.Context, messageBuilder MessageBuilder) string {
+func (l *logger) invokeMessageBuilder(context context.Context, messageBuilder MessageBuilder) string {
 
 	defer l.logPanic(context)
 
@@ -271,7 +284,7 @@ func (l *Logger) invokeMessageBuilder(context context.Context, messageBuilder Me
 	return ""
 }
 
-func (l *Logger) logPanic(context context.Context) {
+func (l *logger) logPanic(context context.Context) {
 
 	if r := recover(); r != nil {
 		l.AlwaysContext(
@@ -291,7 +304,7 @@ func (l *Logger) logPanic(context context.Context) {
 //
 // Simply returns the given attributes list without appending anything if key is
 // not a string.
-func (l *Logger) appendAttribute(context context.Context, attributes []any, key any, val any) []any {
+func (l *logger) appendAttribute(context context.Context, attributes []any, key any, val any) []any {
 
 	switch v := val.(type) {
 
@@ -314,7 +327,7 @@ func (l *Logger) appendAttribute(context context.Context, attributes []any, key 
 }
 
 // Safely invoke injected attribute value function.
-func (l *Logger) invokeAttrHandler(context context.Context, handler func() any) any {
+func (l *logger) invokeAttrHandler(context context.Context, handler func() any) any {
 
 	defer l.logPanic(context)
 	return handler()

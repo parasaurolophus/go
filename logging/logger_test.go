@@ -649,7 +649,13 @@ func TestSyncUnrecognizedLevel(t *testing.T) {
 	writer := bufio.NewWriter(&buffer)
 	ctx := context.Background()
 	lgr := New(writer, nil)
-	wrapped := lgr.wrapped
+	var wrapped *slog.Logger
+	switch l := lgr.(type) {
+	case *logger:
+		wrapped = l.wrapped
+	default:
+		t.Fatalf(`expected logger, got %T`, lgr)
+	}
 	wrapped.Log(ctx, slog.Level(100), "slog.Level(100)")
 	writer.Flush()
 	b := buffer.Bytes()
@@ -917,18 +923,6 @@ func TestSyncIsEnableContext(t *testing.T) {
 	if logger.EnabledContext(context.Background(), TRACE) {
 		t.Fatalf("TRACE should be disabled by default")
 	}
-}
-
-func TestSyncStop(t *testing.T) {
-
-	defer func() {
-		if r := recover(); r != nil {
-			t.Errorf("recovered %v from panic", r)
-		}
-	}()
-
-	logger := New(os.Stdout, nil)
-	logger.Stop()
 }
 
 func TestFileForCaller(t *testing.T) {
