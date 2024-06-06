@@ -7,8 +7,8 @@ package utilities
 // value to out.
 func Async[T any](asyncFunction func(T) T, in chan T, out chan T, panicHandler func(recovered any)) {
 	defer close(out)
-	for v := range in {
-		y := func(x T) (result T) {
+	for value := range in {
+		result := func(x T) (y T) {
 			defer func() {
 				if r := recover(); r != nil {
 					if panicHandler != nil {
@@ -16,9 +16,9 @@ func Async[T any](asyncFunction func(T) T, in chan T, out chan T, panicHandler f
 					}
 				}
 			}()
-			result = asyncFunction(x)
+			y = asyncFunction(x)
 			return
-		}(v)
-		out <- y
+		}(value)
+		out <- result
 	}
 }

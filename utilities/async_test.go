@@ -15,15 +15,19 @@ func TestAsync(t *testing.T) {
 		BaseTags: []string{t.Name()},
 	}
 	logger := logging.New(&buffer, &options)
-	in := make(chan int)
-	out := make(chan int)
-	defer close(out)
-	asyncFunction := func(n int) int {
-		if n%2 == 0 {
-			return n + 1
+	type S struct {
+		Value int
+	}
+	asyncFunction := func(s *S) *S {
+		if s.Value%2 == 0 {
+			s.Value += 1
+			return s
 		}
 		panic("odd")
 	}
+	in := make(chan *S)
+	out := make(chan *S)
+	defer close(out)
 	panicHandler := func(r any) {
 		logger.Always(
 			nil,
@@ -33,15 +37,25 @@ func TestAsync(t *testing.T) {
 		)
 	}
 	go Async(asyncFunction, out, in, panicHandler)
-	out <- 0
+	s := S{Value: 0}
+	out <- &s
 	v := <-in
-	if v != 1 {
-		t.Errorf("expected 1, got %d", v)
+	if v == nil {
+		t.Fatalf("expected result not to be nil")
 	}
-	out <- 1
+	if v != &s {
+		t.Fatalf("expected v to be &s")
+	}
+	if s.Value != 1 {
+		t.Errorf("expected 1, got %d", s.Value)
+	}
+	out <- &s
 	v = <-in
-	if v != 0 {
-		t.Errorf("expected 0, got %d", v)
+	if v != nil {
+		t.Errorf("expected nil, got %v", v)
+	}
+	if s.Value != 1 {
+		t.Errorf("expected 1, got %d", s.Value)
 	}
 	b := buffer.Bytes()
 	entry := map[string]any{}
