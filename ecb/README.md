@@ -2,10 +2,6 @@ Copyright &copy; Kirk Rader 2024
 
 # European Central Bank Exchange Rate Data
 
-```bash
-go doc -all
-```
-
 ```
 package ecb // import "parasaurolophus/go/ecb"
 

@@ -3,7 +3,6 @@ _Copyright &copy; Kirk Rader 2024_
 # Stack Traces for Logging and Error Messages in Go
 
 ```
-$ go doc -all
 package stacktraces // import "parasaurolophus/go/stacktraces"
 
 
