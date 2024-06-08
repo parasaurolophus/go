@@ -13,7 +13,7 @@ func TestMarshalJSON(t *testing.T) {
 		M Money `json:"m,omitempty"`
 	}
 	s := S{
-		M: New(4.2, 2),
+		M: NewMoney(4.2, 2),
 	}
 	b, err := json.Marshal(&s)
 	if err != nil {
@@ -23,7 +23,7 @@ func TestMarshalJSON(t *testing.T) {
 		t.Errorf(`expected {"m":4.20}, got %s`, string(b))
 	}
 	s = S{
-		M: New(4.2, 0),
+		M: NewMoney(4.2, 0),
 	}
 	b, err = json.Marshal(&s)
 	if err != nil {
@@ -35,8 +35,8 @@ func TestMarshalJSON(t *testing.T) {
 }
 
 func TestScan(t *testing.T) {
-	m1 := New(0.0, 2)
-	m2 := New(0.0, 2)
+	m1 := NewMoney(0.0, 2)
+	m2 := NewMoney(0.0, 2)
 	n, err := fmt.Sscan(" 4.20 -0.01 ", m1, m2)
 	if err != nil {
 		t.Error(err.Error())
@@ -73,17 +73,17 @@ func TestScan(t *testing.T) {
 }
 
 func TestString(t *testing.T) {
-	m := New(78.9, 2)
+	m := NewMoney(78.9, 2)
 	s := m.String()
 	if s != "78.90" {
 		t.Errorf(`expected "78.90", got "%s"`, s)
 	}
-	m = New(78.9, 1)
+	m = NewMoney(78.9, 1)
 	s = m.String()
 	if s != "78.9" {
 		t.Errorf(`expected "78.9", got "%s"`, s)
 	}
-	m = New(78.9, -1)
+	m = NewMoney(78.9, -1)
 	s = m.String()
 	if s != "79" {
 		t.Errorf(`expected "79", got "%s"`, s)
@@ -92,7 +92,7 @@ func TestString(t *testing.T) {
 
 func TestUnmarshal(t *testing.T) {
 	type S struct {
-		M money `json:"m,omitempty"`
+		M moneyStruct `json:"m,omitempty"`
 	}
 	var s S
 	err := json.Unmarshal([]byte(`{}`), &s)
