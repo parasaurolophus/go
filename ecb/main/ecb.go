@@ -11,6 +11,7 @@ import (
 	"os"
 	"parasaurolophus/go/ecb"
 	"parasaurolophus/go/utilities"
+	z "parasaurolophus/go/zip"
 )
 
 func encode(data ecb.Data) {
@@ -39,7 +40,7 @@ func raw(reader io.Reader) {
 	}
 }
 
-func csvHandler(parse bool) utilities.ZipHandler {
+func csvHandler(parse bool) z.ZipHandler {
 	return func(entry *zip.File) (err error) {
 		readCloser, err := entry.Open()
 		if err != nil {
@@ -122,7 +123,7 @@ func main() {
 	defer source.Close()
 	switch *format {
 	case "csv":
-		utilities.ForZipReader(csvHandler(*parse), source)
+		z.ForZipReader(csvHandler(*parse), source)
 	case "xml":
 		xml(*parse, source)
 	default:

@@ -1,6 +1,6 @@
 // Copyright Kirk Rader 2024
 
-package utilities
+package zip
 
 import (
 	"archive/zip"

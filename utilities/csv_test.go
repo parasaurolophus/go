@@ -5,6 +5,7 @@ package utilities
 import (
 	"archive/zip"
 	"parasaurolophus/go/common_test"
+	z "parasaurolophus/go/zip"
 	"testing"
 )
 
@@ -35,7 +36,7 @@ func TestForCSVReader(t *testing.T) {
 		err = ForCSVReader(headersHandler, rowHandler, reader)
 		return
 	}
-	err = ForZipReader(zipHandler, embedded)
+	err = z.ForZipReader(zipHandler, embedded)
 	if err != nil {
 		t.Fatal(err.Error())
 	}

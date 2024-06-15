@@ -168,7 +168,7 @@ func normalizeTime(dateString string) (string, error) {
 	if err == nil {
 		return dateString, nil
 	}
-	t, err := time.Parse("2 Jan 2006", dateString)
+	t, err := time.Parse("2 January 2006", dateString)
 	if err == nil {
 		return t.Format(time.DateOnly), nil
 	}

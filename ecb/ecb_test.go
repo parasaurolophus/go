@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"parasaurolophus/go/common_test"
 	"parasaurolophus/go/utilities"
+	z "parasaurolophus/go/zip"
 	"testing"
 )
 
@@ -30,7 +31,7 @@ func TestFetchDailyCSV(t *testing.T) {
 		}
 		return
 	}
-	err = utilities.ForZipReader(handler, readCloser)
+	err = z.ForZipReader(handler, readCloser)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -71,7 +72,7 @@ func TestParseDailyCSV(t *testing.T) {
 		}
 		return
 	}
-	err = utilities.ForZipReader(handler, zipFile)
+	err = z.ForZipReader(handler, zipFile)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -97,7 +98,7 @@ func TestParseHistoricalCSV(t *testing.T) {
 		}
 		return
 	}
-	err = utilities.ForZipReader(handler, zipFile)
+	err = z.ForZipReader(handler, zipFile)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
