@@ -18,17 +18,17 @@ type Money interface {
 	xml.Unmarshaler
 	xml.UnmarshalerAttr
 	Get() float64
+	SetDigits(int) error
+	SetValue(float64)
 }
 
-// Create a monetaryValue structure initialized to the given values. The second
-// parameter specifies the number of digits to emit when converting to text
-// based representations, e.g. 2 for currencies like USD, EUR; 0 for JPY; etc.
-func NewMoney(value float64, digits int) Money {
-	if digits < 0 {
-		digits = 0
-	}
-	return &monetaryValue{
-		value:  value,
-		digits: digits,
-	}
+// Create an instance that implements Money, initialized to the given values.
+// The second parameter specifies the number of digits to emit when converting
+// to text based representations, e.g. 2 for currencies like USD, EUR; 0 for
+// JPY; etc.
+func NewMoney(value float64, digits int) (m Money, err error) {
+	m = new(monetaryValue)
+	m.SetValue(value)
+	err = m.SetDigits(digits)
+	return
 }

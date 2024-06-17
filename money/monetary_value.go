@@ -23,6 +23,22 @@ func (m monetaryValue) Get() float64 {
 	return m.value
 }
 
+// Update the number of digits to the right of the decimal point when
+// representing m in a text-based format.
+func (m *monetaryValue) SetDigits(digits int) (err error) {
+	if digits < 0 {
+		err = fmt.Errorf("negative number of digits specified: %d", digits)
+		return
+	}
+	m.digits = digits
+	return
+}
+
+// Update the numeric value of m.
+func (m *monetaryValue) SetValue(value float64) {
+	m.value = value
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // Implement fmt.Scanner
 

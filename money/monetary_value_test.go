@@ -21,15 +21,21 @@ func TestMarshalJSON(t *testing.T) {
 	if string(b) != "{}" {
 		t.Errorf(`expected "{}", got "%s"`, string(b))
 	}
-	s.M = NewMoney(0.0, 2)
+	s.M, err = NewMoney(0.0, 2)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	b, err = json.Marshal(s)
 	if err != nil {
-		t.Error(err.Error())
+		t.Fatal(err.Error())
 	}
 	if string(b) != `{"m":0.00}` {
 		t.Errorf(`expected {"m":0.00}, got %s`, string(b))
 	}
-	s.M = NewMoney(4.2, 0)
+	s.M, err = NewMoney(4.2, 0)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	b, err = json.Marshal(s)
 	if err != nil {
 		t.Error(err.Error())
@@ -52,7 +58,10 @@ func TestMarshalXML(t *testing.T) {
 	if string(b) != "<s></s>" {
 		t.Errorf(`expected "<s></s>", got "%s"`, string(b))
 	}
-	s.M = NewMoney(0.0, 2)
+	s.M, err = NewMoney(0.0, 2)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	b, err = xml.Marshal(s)
 	if err != nil {
 		t.Error(err.Error())
@@ -60,7 +69,10 @@ func TestMarshalXML(t *testing.T) {
 	if string(b) != `<s><m>0.00</m></s>` {
 		t.Errorf(`expected <s><m>0.00</m></s>, got %s`, string(b))
 	}
-	s.M = NewMoney(4.2, 0)
+	s.M, err = NewMoney(4.2, 0)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	b, err = xml.Marshal(s)
 	if err != nil {
 		t.Error(err.Error())
@@ -71,11 +83,17 @@ func TestMarshalXML(t *testing.T) {
 }
 
 func TestScan(t *testing.T) {
-	m1 := NewMoney(0.0, 2)
-	m2 := NewMoney(0.0, 2)
+	m1, err := NewMoney(0.0, 2)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	m2, err := NewMoney(0.0, 2)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	n, err := fmt.Sscan(" 4.20 -0.01 ", m1, m2)
 	if err != nil {
-		t.Error(err.Error())
+		t.Fatal(err.Error())
 	}
 	if n != 2 {
 		t.Errorf("expected 2, got %d", n)
@@ -109,20 +127,25 @@ func TestScan(t *testing.T) {
 }
 
 func TestString(t *testing.T) {
-	m := NewMoney(78.9, 2)
+	m, err := NewMoney(78.9, 2)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	s := m.String()
 	if s != "78.90" {
 		t.Errorf(`expected "78.90", got "%s"`, s)
 	}
-	m = NewMoney(78.9, 1)
+	m, err = NewMoney(78.9, 1)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	s = m.String()
 	if s != "78.9" {
 		t.Errorf(`expected "78.9", got "%s"`, s)
 	}
-	m = NewMoney(78.9, -1)
-	s = m.String()
-	if s != "79" {
-		t.Errorf(`expected "79", got "%s"`, s)
+	m, err = NewMoney(78.9, -1)
+	if err == nil {
+		t.Fatal("expected err not to be nil")
 	}
 }
 
@@ -138,7 +161,10 @@ func TestUnmarshalJSON(t *testing.T) {
 	if s.M != nil {
 		t.Errorf(`expected nil, got %v`, s.M)
 	}
-	s.M = NewMoney(0.0, 2)
+	s.M, err = NewMoney(0.0, 2)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	err = json.Unmarshal([]byte(`{"m": 4.200}`), &s)
 	if err != nil {
 		t.Errorf(err.Error())
@@ -161,7 +187,10 @@ func TestUnmarshalXMLAttribute(t *testing.T) {
 	if s.M != nil {
 		t.Errorf("expected nil, got %v", s.M)
 	}
-	s.M = NewMoney(0.0, 2)
+	s.M, err = NewMoney(0.0, 2)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	err = xml.Unmarshal([]byte(`<s m="4.20"/>`), &s)
 	if err != nil {
 		t.Errorf(err.Error())
@@ -191,7 +220,10 @@ func TestUnmarshalXMLElement(t *testing.T) {
 	if s.M != nil {
 		t.Errorf("expected nil, got %v", s.M)
 	}
-	s.M = NewMoney(0.0, 2)
+	s.M, err = NewMoney(0.0, 2)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 	err = xml.Unmarshal([]byte(`<s><m>4.20</m></s>`), &s)
 	if err != nil {
 		t.Errorf(err.Error())
