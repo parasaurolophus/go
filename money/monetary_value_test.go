@@ -154,7 +154,7 @@ func TestString(t *testing.T) {
 	if s != "78.9" {
 		t.Errorf(`expected "78.9", got "%s"`, s)
 	}
-	m, err = NewMoney(78.9, -1)
+	_, err = NewMoney(78.9, -1)
 	if err == nil {
 		t.Fatal("expected err not to be nil")
 	}
