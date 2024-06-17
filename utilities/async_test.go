@@ -4,6 +4,7 @@ package utilities
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"parasaurolophus/go/logging"
 	"testing"
@@ -30,6 +31,7 @@ func TestAsync(t *testing.T) {
 	defer close(out)
 	panicHandler := func(r any) {
 		logger.Always(
+			context.Background(),
 			nil,
 			logging.RECOVERED, r,
 			logging.TAGS, t.Name(),

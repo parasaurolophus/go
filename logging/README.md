@@ -2,6 +2,8 @@ _Copyright &copy; Kirk Rader 2024_
 
 # Wrapper for `log/slog`
 
+Output of `go doc -all`:
+
 ```
 package logging // import "parasaurolophus/go/logging"
 
@@ -87,16 +89,11 @@ const (
 TYPES
 
 type Logger interface {
-        Trace(MessageBuilder, ...any)
-        TraceContext(context.Context, MessageBuilder, ...any)
-        Fine(MessageBuilder, ...any)
-        FineContext(context.Context, MessageBuilder, ...any)
-        Optional(MessageBuilder, ...any)
-        OptionalContext(context.Context, MessageBuilder, ...any)
-        Always(MessageBuilder, ...any)
-        AlwaysContext(context.Context, MessageBuilder, ...any)
-        Enabled(Verbosity) bool
-        EnabledContext(context.Context, Verbosity) bool
+        Trace(context.Context, MessageBuilder, ...any)
+        Fine(context.Context, MessageBuilder, ...any)
+        Optional(context.Context, MessageBuilder, ...any)
+        Always(context.Context, MessageBuilder, ...any)
+        Enabled(context.Context, Verbosity) bool
         BaseAttributes() []any
         SetBaseAttributes(...any)
         BaseTags() []string

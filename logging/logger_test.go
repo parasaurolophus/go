@@ -24,45 +24,7 @@ func TestSyncTrace(t *testing.T) {
 	logger := New(writer, nil)
 	logger.SetVerbosity(TRACE)
 	logger.Trace(
-		func() string {
-			return "trace"
-		})
-	writer.Flush()
-	b := buffer.Bytes()
-	type logEntry struct {
-		Time      string   `json:"time"`
-		Verbosity string   `json:"verbosity"`
-		Msg       string   `json:"msg"`
-		Tags      []string `json:"tags,omitempty"`
-	}
-	entry := logEntry{}
-	err := json.Unmarshal(b, &entry)
-	if err != nil {
-		t.Fatalf("error unmarshaling log entry; %s", err.Error())
-	}
-	if entry.Verbosity != "TRACE" {
-		t.Fatalf(
-			"expected verbosity 'TRACE', got '%s'",
-			entry.Verbosity)
-	}
-	if entry.Msg != "trace" {
-		t.Fatalf(
-			"expected msg 'trace', got '%s'",
-			entry.Msg)
-	}
-	if len(entry.Tags) != 0 {
-		t.Fatalf("expected no tags, got %#v", entry.Tags)
-	}
-}
-
-func TestSyncTraceContext(t *testing.T) {
-	buffer := bytes.Buffer{}
-	writer := bufio.NewWriter(&buffer)
-	logger := New(writer, nil)
-	logger.SetVerbosity(TRACE)
-	ctx := context.Background()
-	logger.TraceContext(
-		ctx,
+		context.Background(),
 		func() string {
 			return "trace"
 		})
@@ -99,40 +61,7 @@ func TestSyncFine(t *testing.T) {
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
 	logger.Fine(
-		func() string {
-			return "fine"
-		})
-	writer.Flush()
-	b := buffer.Bytes()
-	type logEntry struct {
-		Time      string `json:"time"`
-		Verbosity string `json:"verbosity"`
-		Msg       string `json:"msg"`
-	}
-	entry := logEntry{}
-	err := json.Unmarshal(b, &entry)
-	if err != nil {
-		t.Fatalf("error unmarshaling log entry; %s", err.Error())
-	}
-	if entry.Verbosity != "FINE" {
-		t.Fatalf(
-			"expected verbosity 'FINE', got '%s'",
-			entry.Verbosity)
-	}
-	if entry.Msg != "fine" {
-		t.Fatalf(
-			"expected msg 'fine', got '%s'",
-			entry.Msg)
-	}
-}
-
-func TestSyncFineContext(t *testing.T) {
-	buffer := bytes.Buffer{}
-	writer := bufio.NewWriter(&buffer)
-	logger := New(writer, nil)
-	ctx := context.Background()
-	logger.FineContext(
-		ctx,
+		context.Background(),
 		func() string {
 			return "fine"
 		})
@@ -165,40 +94,7 @@ func TestSyncOptional(t *testing.T) {
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
 	logger.Optional(
-		func() string {
-			return "optional"
-		})
-	writer.Flush()
-	b := buffer.Bytes()
-	type logEntry struct {
-		Time      string `json:"time"`
-		Verbosity string `json:"verbosity"`
-		Msg       string `json:"msg"`
-	}
-	entry := logEntry{}
-	err := json.Unmarshal(b, &entry)
-	if err != nil {
-		t.Fatalf("error unmarshaling log entry; %s", err.Error())
-	}
-	if entry.Verbosity != "OPTIONAL" {
-		t.Fatalf(
-			"expected verbosity 'OPTIONAL', got '%s'",
-			entry.Verbosity)
-	}
-	if entry.Msg != "optional" {
-		t.Fatalf(
-			"expected msg 'optional', got '%s'",
-			entry.Msg)
-	}
-}
-
-func TestSyncOptionalContext(t *testing.T) {
-	buffer := bytes.Buffer{}
-	writer := bufio.NewWriter(&buffer)
-	logger := New(writer, nil)
-	ctx := context.Background()
-	logger.OptionalContext(
-		ctx,
+		context.Background(),
 		func() string {
 			return "optional"
 		})
@@ -252,115 +148,7 @@ func TestSyncAlways(t *testing.T) {
 	logger := New(writer, &options)
 	counters.Error1 += 1
 	logger.Always(
-		func() string {
-			builderCalled = true
-			return "always"
-		},
-		STACKTRACE, nil,
-		TAGS, additionalTags,
-		"foo", "bar")
-	writer.Flush()
-	bytes := buffer.Bytes()
-	type logEntry struct {
-		Time       string   `json:"time"`
-		Verbosity  string   `json:"verbosity"`
-		Msg        string   `json:"msg"`
-		Counters   Counters `json:"counters"`
-		StackTrace string   `json:"stacktrace"`
-		Tags       []string `json:"tags"`
-		Foo        string   `json:"foo"`
-	}
-	entry := logEntry{}
-	err := json.Unmarshal(bytes, &entry)
-	if err != nil {
-		t.Fatalf("error unmarshaling log entry; %s", err.Error())
-	}
-	if !replacerCalled {
-		t.Fatalf("expected attribute replacer to have been called")
-	}
-	if !builderCalled {
-		t.Fatalf("expected message builder to havve been called")
-	}
-	_, err = time.Parse(time.RFC3339Nano, entry.Time)
-	if err != nil {
-		t.Fatalf(
-			"error parsing time '%s'; %s",
-			entry.Time,
-			err.Error())
-	}
-	if entry.Verbosity != "ALWAYS" {
-		t.Fatalf(
-			"expected verbosity to be 'ALWAYS', got '%s'",
-			entry.Verbosity)
-	}
-	if entry.Msg != "always" {
-		t.Fatalf(
-			"expected msg to be 'always', got '%s'",
-			entry.Msg)
-	}
-	if entry.Counters.Error1 != 1 {
-		t.Fatalf(
-			"expected Error1 to be 1, got %d",
-			entry.Counters.Error1)
-	}
-	if entry.Counters.Error2 != 0 {
-		t.Fatalf(
-			"expected Error2 to be 0, got %d",
-			entry.Counters.Error2)
-	}
-	name, _, err := stacktraces_test.FirstFunctionShort(entry.StackTrace)
-	if err != nil {
-		t.Fatalf("error parsing stack frames; %s", err.Error())
-	}
-	functionName := stacktraces.FunctionName()
-	if name != functionName {
-		t.Fatalf("expected first stack frame to be for '%s', got '%s'", functionName, name)
-	}
-	if entry.StackTrace == "" {
-		t.Fatalf("expected stack trace not to be empty")
-	}
-	combinedTags := append(baseTags, additionalTags...)
-	if len(entry.Tags) != len(combinedTags) {
-		t.Fatalf("expected length of %#v to be 2, got %d", entry.Tags, len(entry.Tags))
-	}
-	for _, val := range combinedTags {
-		if !slices.Contains[[]string](entry.Tags, val) {
-			t.Fatalf("expected %#v to contain '%s'", entry.Tags, val)
-		}
-	}
-	if entry.Foo != "bar" {
-		t.Fatalf("expected foo to be 'bar', got '%s'", entry.Foo)
-	}
-}
-
-func TestSyncAlwaysContext(t *testing.T) {
-	buffer := bytes.Buffer{}
-	writer := bufio.NewWriter(&buffer)
-	type Counters struct {
-		Error1 uint `json:"error1"`
-		Error2 uint `json:"error2"`
-	}
-	counters := Counters{
-		Error1: 0,
-		Error2: 0,
-	}
-	replacerCalled := false
-	builderCalled := false
-	baseTags := []string{"base"}
-	additionalTags := []string{"additional"}
-	options := LoggerOptions{
-		BaseAttributes: []any{"counters", &counters},
-		BaseTags:       baseTags,
-		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
-			replacerCalled = true
-			return a
-		},
-	}
-	logger := New(writer, &options)
-	ctx := context.Background()
-	counters.Error1 += 1
-	logger.AlwaysContext(
-		ctx,
+		context.Background(),
 		func() string {
 			builderCalled = true
 			return "always"
@@ -459,7 +247,7 @@ func TestSyncNilBuilder(t *testing.T) {
 	logger := New(writer, &options)
 	logger.SetBaseAttributes("counters", &counters)
 	counters.Error1 += 1
-	logger.Always(nil, STACKTRACE, 0)
+	logger.Always(context.Background(), nil, STACKTRACE, 0)
 	writer.Flush()
 	bytes := buffer.Bytes()
 	type logEntry struct {
@@ -520,6 +308,7 @@ func TestSyncNilBuilder(t *testing.T) {
 }
 
 func TestSyncLazyEvaluation(t *testing.T) {
+	ctx := context.Background()
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	replacerCalled := false
@@ -530,10 +319,11 @@ func TestSyncLazyEvaluation(t *testing.T) {
 		},
 	}
 	logger := New(writer, &options)
-	if logger.Enabled(TRACE) {
+	if logger.Enabled(ctx, TRACE) {
 		t.Fatalf("expected TRACE to be disabled by default")
 	}
 	logger.Trace(
+		ctx,
 		func() string {
 			t.Errorf("msg builder should not be called")
 			return "error"
@@ -555,7 +345,7 @@ func TestSyncIntTag(t *testing.T) {
 		BaseTags: []string{"test"},
 	}
 	logger := New(writer, &options)
-	logger.Always(nil, TAGS, 1)
+	logger.Always(context.Background(), nil, TAGS, 1)
 	writer.Flush()
 	b := buffer.Bytes()
 	type Entry struct {
@@ -587,7 +377,7 @@ func TestSyncStringTag(t *testing.T) {
 		BaseTags: []string{"test"},
 	}
 	logger := New(writer, &options)
-	logger.Always(nil, TAGS, "foo")
+	logger.Always(context.Background(), nil, TAGS, "foo")
 	writer.Flush()
 	b := buffer.Bytes()
 	type Entry struct {
@@ -619,7 +409,7 @@ func TestSyncStringerTag(t *testing.T) {
 		BaseTags: []string{"test"},
 	}
 	logger := New(writer, &options)
-	logger.Always(nil, TAGS, TRACE)
+	logger.Always(context.Background(), nil, TAGS, TRACE)
 	writer.Flush()
 	b := buffer.Bytes()
 	type Entry struct {
@@ -651,7 +441,7 @@ func TestSyncUnrecognizedLevel(t *testing.T) {
 	lgr := New(writer, nil)
 	var wrapped *slog.Logger
 	switch l := lgr.(type) {
-	case *logger:
+	case *loggerStruct:
 		wrapped = l.wrapped
 	default:
 		t.Fatalf(`expected logger, got %T`, lgr)
@@ -733,7 +523,7 @@ func TestSyncOddAttributes(t *testing.T) {
 		BaseTags:       []string{"test"},
 	}
 	logger := New(writer, &options)
-	logger.Always(nil, "baz", "waka", "hoo")
+	logger.Always(context.Background(), nil, "baz", "waka", "hoo")
 	writer.Flush()
 	b := buffer.Bytes()
 	type Entry struct {
@@ -770,7 +560,12 @@ func TestSyncBadKey(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
-	logger.Always(nil, "good1", 1, 10, "bad", "good2", 2)
+	logger.Always(
+		context.Background(),
+		nil,
+		"good1", 1,
+		10, "bad",
+		"good2", 2)
 	writer.Flush()
 	b := buffer.Bytes()
 	type Entry struct {
@@ -798,6 +593,7 @@ func TestSyncMessageBuilderPanic(t *testing.T) {
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
 	logger.Always(
+		context.Background(),
 		func() string { panic("deliberate") },
 	)
 	writer.Flush()
@@ -838,7 +634,7 @@ func TestSyncNegativeStackTraceParam(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
-	logger.Always(nil, STACKTRACE, -2)
+	logger.Always(context.Background(), nil, STACKTRACE, -2)
 	writer.Flush()
 	b := buffer.Bytes()
 	type Entry struct {
@@ -866,7 +662,7 @@ func TestSyncZeroStackTraceParam(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
-	logger.Always(nil, STACKTRACE, 0)
+	logger.Always(context.Background(), nil, STACKTRACE, 0)
 	writer.Flush()
 	b := buffer.Bytes()
 	type Entry struct {
@@ -894,7 +690,7 @@ func TestSyncStringStackTraceParam(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
-	logger.Always(nil, STACKTRACE, expected)
+	logger.Always(context.Background(), nil, STACKTRACE, expected)
 	writer.Flush()
 	b := buffer.Bytes()
 	type Entry struct {
@@ -920,7 +716,7 @@ func TestSyncStringStackTraceParam(t *testing.T) {
 func TestSyncIsEnableContext(t *testing.T) {
 
 	logger := New(os.Stdout, nil)
-	if logger.EnabledContext(context.Background(), TRACE) {
+	if logger.Enabled(context.Background(), TRACE) {
 		t.Fatalf("TRACE should be disabled by default")
 	}
 }
@@ -930,7 +726,10 @@ func TestFileForCaller(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
-	logger.Always(nil, FILE, FILE_SKIPFRAMES_FOR_CALLER)
+	logger.Always(
+		context.Background(),
+		nil,
+		FILE, FILE_SKIPFRAMES_FOR_CALLER)
 	writer.Flush()
 	b := buffer.Bytes()
 
@@ -970,7 +769,10 @@ func TestFileForPanic(t *testing.T) {
 			t.Fatalf("expected a panic")
 		}
 
-		logger.Always(nil, FILE, FILE_SKIPFRAMES_FOR_PANIC)
+		logger.Always(
+			context.Background(),
+			nil,
+			FILE, FILE_SKIPFRAMES_FOR_PANIC)
 
 		writer.Flush()
 		b := buffer.Bytes()
@@ -1002,7 +804,7 @@ func TestFileSkipFramesError(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
-	logger.Always(nil, FILE, 100)
+	logger.Always(context.Background(), nil, FILE, 100)
 	writer.Flush()
 	b := buffer.Bytes()
 
@@ -1035,7 +837,7 @@ func TestStringerAttribute(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
-	logger.Always(nil, FINE, "stringer")
+	logger.Always(context.Background(), nil, FINE, "stringer")
 	writer.Flush()
 	b := buffer.Bytes()
 
@@ -1064,7 +866,10 @@ func TestFuncAtttrValue(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
-	logger.Always(nil, "func", func() any { return "func value" })
+	logger.Always(
+		context.Background(),
+		nil,
+		"func", func() any { return "func value" })
 	writer.Flush()
 	b := buffer.Bytes()
 
@@ -1093,7 +898,11 @@ func TestFuncAtttrPanic(t *testing.T) {
 	buffer := bytes.Buffer{}
 	writer := bufio.NewWriter(&buffer)
 	logger := New(writer, nil)
-	logger.Always(nil, "func", func() any { panic("deliberate") })
+	logger.Always(
+		context.Background(),
+		nil,
+		"func", func() any { panic("deliberate") },
+	)
 	writer.Flush()
 	s := buffer.String()
 	parts := strings.Split(s, "\n")
