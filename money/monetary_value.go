@@ -6,7 +6,6 @@ import (
 	"encoding/xml"
 	"fmt"
 	"strconv"
-	"unicode"
 )
 
 // Implementation of Money interface.
@@ -18,8 +17,14 @@ type monetaryValue struct {
 ///////////////////////////////////////////////////////////////////////////////
 // Implement utilities.Money
 
+// Return the number of digits to the right of the decimal point when
+// representing m in a text-based format.
+func (m monetaryValue) GetDigits() int {
+	return m.digits
+}
+
 // Return the numeric value of m.
-func (m monetaryValue) Get() float64 {
+func (m monetaryValue) GetValue() float64 {
 	return m.value
 }
 
@@ -48,22 +53,7 @@ func (m *monetaryValue) SetValue(value float64) {
 // contents of the given fmt.ScanState as a float64 fails. The value of m is set
 // to 0.0 if error is non-nil.
 func (m *monetaryValue) Scan(state fmt.ScanState, _ rune) (err error) {
-	makeTokenTest := func() func(rune) bool {
-		firstRune := true
-		decimalPointSeen := false
-		return func(r rune) bool {
-			defer func() { firstRune = false }()
-			if r == '-' {
-				return firstRune
-			}
-			if r == '.' {
-				defer func() { decimalPointSeen = true }()
-				return !decimalPointSeen
-			}
-			return unicode.IsDigit(r)
-		}
-	}
-	token, err := state.Token(true, makeTokenTest())
+	token, err := state.Token(true, MakeFloatTokenTest())
 	if err != nil {
 		return
 	}

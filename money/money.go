@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"unicode"
 )
 
 // An interface for representing monetary values in text-based formats.
@@ -17,7 +18,8 @@ type Money interface {
 	xml.Marshaler
 	xml.Unmarshaler
 	xml.UnmarshalerAttr
-	Get() float64
+	GetDigits() int
+	GetValue() float64
 	SetDigits(int) error
 	SetValue(float64)
 }
@@ -31,4 +33,24 @@ func NewMoney(value float64, digits int) (m Money, err error) {
 	m.SetValue(value)
 	err = m.SetDigits(digits)
 	return
+}
+
+// Return a closure that tests the given rune as to whether it is a valid
+// character in the text representation of a floating-point function. The
+// returned closure encapsulates state variables used to enforce floating-point
+// syntax rules compatible with JSON.
+func MakeFloatTokenTest() func(rune) bool {
+	firstRune := true
+	decimalPointSeen := false
+	return func(r rune) bool {
+		defer func() { firstRune = false }()
+		if r == '-' {
+			return firstRune
+		}
+		if r == '.' {
+			defer func() { decimalPointSeen = true }()
+			return !decimalPointSeen
+		}
+		return unicode.IsDigit(r)
+	}
 }

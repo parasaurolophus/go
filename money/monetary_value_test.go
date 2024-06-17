@@ -9,6 +9,17 @@ import (
 	"testing"
 )
 
+func TestGetDigits(t *testing.T) {
+	m, err := NewMoney(4.2, 3)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	actual := m.GetDigits()
+	if actual != 3 {
+		t.Fatalf("expected 3, got %d", actual)
+	}
+}
+
 func TestMarshalJSON(t *testing.T) {
 	type S struct {
 		M Money `json:"m,omitempty"`
@@ -98,11 +109,11 @@ func TestScan(t *testing.T) {
 	if n != 2 {
 		t.Errorf("expected 2, got %d", n)
 	}
-	if m1.Get() != 4.2 {
-		t.Errorf("expected 4.2, got %f", m1.Get())
+	if m1.GetValue() != 4.2 {
+		t.Errorf("expected 4.2, got %f", m1.GetValue())
 	}
-	if m2.Get() != -0.01 {
-		t.Errorf("expected -0.01, got %f", m1.Get())
+	if m2.GetValue() != -0.01 {
+		t.Errorf("expected -0.01, got %f", m1.GetValue())
 	}
 	n, err = fmt.Sscan("12.34.", m1)
 	if err != nil {
@@ -111,8 +122,8 @@ func TestScan(t *testing.T) {
 	if n != 1 {
 		t.Errorf("expected 1, got %d", n)
 	}
-	if m1.Get() != 12.34 {
-		t.Errorf("expected 12.34, got %f", m1.Get())
+	if m1.GetValue() != 12.34 {
+		t.Errorf("expected 12.34, got %f", m1.GetValue())
 	}
 	n, err = fmt.Sscan("567.80-", m1)
 	if err != nil {
@@ -121,8 +132,8 @@ func TestScan(t *testing.T) {
 	if n != 1 {
 		t.Errorf("expected 1, got %d", n)
 	}
-	if m1.Get() != 567.8 {
-		t.Errorf("expected 567.8, got %f", m1.Get())
+	if m1.GetValue() != 567.8 {
+		t.Errorf("expected 567.8, got %f", m1.GetValue())
 	}
 }
 
@@ -169,8 +180,8 @@ func TestUnmarshalJSON(t *testing.T) {
 	if err != nil {
 		t.Errorf(err.Error())
 	}
-	if s.M.Get() != 4.2 {
-		t.Errorf("expected 4.2, got %f", s.M.Get())
+	if s.M.GetValue() != 4.2 {
+		t.Errorf("expected 4.2, got %f", s.M.GetValue())
 	}
 }
 
@@ -195,15 +206,15 @@ func TestUnmarshalXMLAttribute(t *testing.T) {
 	if err != nil {
 		t.Errorf(err.Error())
 	}
-	if s.M.Get() != 4.2 {
-		t.Errorf("expected 4.2, got %f", s.M.Get())
+	if s.M.GetValue() != 4.2 {
+		t.Errorf("expected 4.2, got %f", s.M.GetValue())
 	}
 	err = xml.Unmarshal([]byte(`<s m="invalid"/>`), &s)
 	if err == nil {
 		t.Error("expected err not to be nil")
 	}
-	if s.M.Get() != 0.0 {
-		t.Errorf("expected 0.0, got %f", s.M.Get())
+	if s.M.GetValue() != 0.0 {
+		t.Errorf("expected 0.0, got %f", s.M.GetValue())
 	}
 }
 
@@ -228,7 +239,7 @@ func TestUnmarshalXMLElement(t *testing.T) {
 	if err != nil {
 		t.Errorf(err.Error())
 	}
-	if s.M.Get() != 4.2 {
-		t.Errorf("expected 4.2, got %f", s.M.Get())
+	if s.M.GetValue() != 4.2 {
+		t.Errorf("expected 4.2, got %f", s.M.GetValue())
 	}
 }
