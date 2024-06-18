@@ -42,7 +42,12 @@ func ForEachZipEntryFromFile(handler ZipHandler, file *os.File) error {
 	return ForEachZipEntry(handler, file, info.Size())
 }
 
-// Apply the given handler to each entry in the given zip archive.
+// Apply the given handler to each entry in the given zip archive. Warning! Due
+// to defects in the archive/zip library interfaces, this function copies the
+// entire contents of the given reader to a temporary file and deletes that
+// file before returning. Make sure that any server-side components that call
+// this are configured appropriately, e.g. by allocating sufficient memory to
+// their ephemeral file systems or the like.
 func ForEachZipEntryFromReader(handler ZipHandler, reader io.Reader) error {
 	file, err := os.CreateTemp(os.TempDir(), "ForZipReader")
 	if err != nil {

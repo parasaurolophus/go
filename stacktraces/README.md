@@ -2,28 +2,13 @@ _Copyright &copy; Kirk Rader 2024_
 
 # Stack Traces for Logging and Error Messages in Go
 
+Output of `go doc -all`:
+
 ```
 package stacktraces // import "parasaurolophus/go/stacktraces"
 
 
 FUNCTIONS
-
-func FunctionInfo(skipFrames any) (int, string, string, int, bool)
-    Return call stack info for a function that directly or indirectly called
-    this one.
-
-    See README.md for an explanation of the skipFrames parameter.
-
-    Return values are:
-
-      - Frame number of the caller
-      - Function name of the caller
-      - Source file name of the caller
-      - Source line number of the caller
-      - true or false depending on whether or not the specified caller was
-        actually found
-
-    If the last value is false, the others are set to their "zero values."
 
 func FunctionName() string
     Return the name of the function that called this one, i.e. the currently
@@ -44,8 +29,32 @@ func ShortStackTrace(skipFrames any) string
 
 TYPES
 
+type SourceInfo struct {
+        Function string `json:"function"`
+        File     string `json:"file"`
+        Line     int    `json:"line"`
+}
+    Struct returned by stacktraces.FunctionInfo().
+
+func FunctionInfo(skipFrames any) (int, SourceInfo, bool)
+    Return call stack info for a function that directly or indirectly called
+    this one.
+
+    See README.md for an explanation of the skipFrames parameter.
+
+    Return values are:
+
+      - Frame number of the caller
+      - Function name of the caller
+      - Source file name of the caller
+      - Source line number of the caller
+      - true or false depending on whether or not the specified caller was
+        actually found
+
+    If the last value is false, the others are set to their "zero values."
+
 type StackTrace struct {
-	// Has unexported fields.
+        // Has unexported fields.
 }
     Error objects that contain the current call stack at the time they were
     created.

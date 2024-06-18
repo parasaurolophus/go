@@ -11,18 +11,19 @@ CONSTANTS
 const (
 
         // URL for the exchange rate CSV data for the current day.
-        DailyCSV = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref.zip"
+        DAILY_CSV_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref.zip"
 
         // URL for the exchange rate XML data for the current day.
-        DailyXML = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
+        DAILY_XML_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
 
         // URL for the historical exchange rate CSV data.
-        HistoricalCSV = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.zip"
+        HISTORICAL_CSV_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.zip"
 
-        HistoricalXML = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.xml"
+        // URL for the historical exchange rate XML data.
+        HISTORICAL_XML_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.xml"
 
         // URL for the exchange rate XML data for the last 90 days.
-        NinetyDayXML = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml"
+        NINETY_DAY_XML_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml"
 )
 
 TYPES
@@ -30,10 +31,10 @@ TYPES
 type Data []Datum
     List of ECB exchange rate data.
 
-func ParseCSV(readCloser io.ReadCloser) (Data, error)
+func ParseCSV(reader io.Reader) (Data, error)
     Parse the ECB CSV data from the given reader.
 
-func ParseXML(readCloser io.ReadCloser) (Data, error)
+func ParseXML(reader io.Reader) (Data, error)
     Parse the ECB XML data from the given reader.
 
 type Datum struct {

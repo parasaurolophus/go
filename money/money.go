@@ -8,7 +8,12 @@ import (
 	"fmt"
 )
 
-// An interface for representing monetary values in text-based formats.
+// An interface for representing monetary values in text-based formats. Note
+// that this type is concerned only with the representation of a float64 in
+// data-exchange formats like JSON or XML. Implementation should not be assumed
+// to alter the precision of the underlying value in memory nor directly
+// support localization such as currency symbols, fraction separator glyphs
+// etc.
 type Money interface {
 	fmt.Scanner
 	fmt.Stringer

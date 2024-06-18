@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+// Return the function name and frame number from the first entry in the given
+// output of stacktraces.ShortStackTrace(any).
 func FirstFunctionShort(strackTrace string) (string, int, error) {
 
 	frame := strings.Split(strackTrace, "<")[0]
@@ -22,6 +24,8 @@ func FirstFunctionShort(strackTrace string) (string, int, error) {
 	return name, n, err
 }
 
+// Return the function name and frame number from the first entry in the given
+// output of stacktraces.LongStackTrace(any).
 func FirstFunctionLong(stackTrace string) (string, int, error) {
 
 	frame := strings.Split(stackTrace, "\n")[0]

@@ -27,10 +27,6 @@ const (
         // Value will be merged with the currently configured
         // LoggerOptions.BaseTags.
         TAGS = "tags"
-)
-    Specially handled attributes.
-
-const (
 
         // Value to use for FILE attribute when logging normal functionality.
         FILE_SKIPFRAMES_FOR_CALLER = -2
@@ -38,6 +34,8 @@ const (
         // Value to use for FILE attribute when logging a panic.
         FILE_SKIPFRAMES_FOR_PANIC = -4
 )
+    Specially handled attributes.
+
 const (
         ALERT           = "ALERT"
         DEBUG           = "DEBUG"
