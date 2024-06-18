@@ -3,21 +3,14 @@
 package csv
 
 import (
-	"archive/zip"
+	"bytes"
 	"fmt"
-	"parasaurolophus/go/common_test"
-	z "parasaurolophus/go/zip"
 	"testing"
 )
 
 func TestForEachCSVRow(t *testing.T) {
-	embedded, err := common_test.TestData.Open("testdata/eurofxref-hist.zip")
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	defer embedded.Close()
+	reader := bytes.NewReader([]byte("foo,bar\n1,3\n2,4"))
 	initialized := false
-	zipCount := 0
 	rowCount := 0
 	headersHandler := func(headers []string) ([]string, error) {
 		initialized = true
@@ -27,25 +20,12 @@ func TestForEachCSVRow(t *testing.T) {
 		rowCount += 1
 		return nil
 	}
-	zipHandler := func(entry *zip.File) (err error) {
-		reader, err := entry.Open()
-		if err != nil {
-			return
-		}
-		defer reader.Close()
-		zipCount += 1
-		err = ForEachCSVRow(headersHandler, rowHandler, reader)
-		return
-	}
-	err = z.ForEachZipEntryFromReader(zipHandler, embedded)
+	err := ForEachCSVRow(headersHandler, rowHandler, reader)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 	if !initialized {
 		t.Error(`not initialized`)
-	}
-	if zipCount != 1 {
-		t.Errorf(`expected 1, got %d`, zipCount)
 	}
 	if rowCount < 2 {
 		t.Errorf(`expected at least 2, got %d`, rowCount)
@@ -53,27 +33,14 @@ func TestForEachCSVRow(t *testing.T) {
 }
 
 func TestForEachCSVRowPanic(t *testing.T) {
-	embedded, err := common_test.TestData.Open("testdata/eurofxref-hist.zip")
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	defer embedded.Close()
+	reader := bytes.NewReader([]byte("foo,bar\n1,3\n2,4"))
 	headersHandler := func(headers []string) ([]string, error) {
 		return headers, nil
 	}
 	rowHandler := func(headers, columns []string) error {
 		panic("deliberate")
 	}
-	zipHandler := func(entry *zip.File) (err error) {
-		reader, err := entry.Open()
-		if err != nil {
-			return
-		}
-		defer reader.Close()
-		err = ForEachCSVRow(headersHandler, rowHandler, reader)
-		return
-	}
-	err = z.ForEachZipEntryFromReader(zipHandler, embedded)
+	err := ForEachCSVRow(headersHandler, rowHandler, reader)
 	if err == nil {
 		t.Fatal("expected err not to be nil")
 	}
@@ -83,27 +50,14 @@ func TestForEachCSVRowPanic(t *testing.T) {
 }
 
 func TestForEachCSVRowHeadersError(t *testing.T) {
-	embedded, err := common_test.TestData.Open("testdata/eurofxref-hist.zip")
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	defer embedded.Close()
+	reader := bytes.NewReader([]byte("foo,bar\n1,3\n2,4"))
 	headersHandler := func(headers []string) ([]string, error) {
 		return nil, fmt.Errorf("deliberate")
 	}
 	rowHandler := func(headers, columns []string) error {
 		return nil
 	}
-	zipHandler := func(entry *zip.File) (err error) {
-		reader, err := entry.Open()
-		if err != nil {
-			return
-		}
-		defer reader.Close()
-		err = ForEachCSVRow(headersHandler, rowHandler, reader)
-		return
-	}
-	err = z.ForEachZipEntryFromReader(zipHandler, embedded)
+	err := ForEachCSVRow(headersHandler, rowHandler, reader)
 	if err == nil {
 		t.Fatal("expected err not to be nil")
 	}
@@ -113,31 +67,35 @@ func TestForEachCSVRowHeadersError(t *testing.T) {
 }
 
 func TestForEachCSVRowRowError(t *testing.T) {
-	embedded, err := common_test.TestData.Open("testdata/eurofxref-hist.zip")
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	defer embedded.Close()
+	reader := bytes.NewReader([]byte("foo,bar\n1,3\n2,4"))
 	headersHandler := func(headers []string) ([]string, error) {
 		return headers, nil
 	}
 	rowHandler := func(headers, columns []string) error {
 		return fmt.Errorf("deliberate")
 	}
-	zipHandler := func(entry *zip.File) (err error) {
-		reader, err := entry.Open()
-		if err != nil {
-			return
-		}
-		defer reader.Close()
-		err = ForEachCSVRow(headersHandler, rowHandler, reader)
-		return
-	}
-	err = z.ForEachZipEntryFromReader(zipHandler, embedded)
+	err := ForEachCSVRow(headersHandler, rowHandler, reader)
 	if err == nil {
 		t.Fatal("expected err not to be nil")
 	}
 	if err.Error() != "deliberate" {
 		t.Errorf(`expected "deliberate", got "%s"`, err.Error())
+	}
+}
+
+func TestForEachCSVRowRowEOF(t *testing.T) {
+	reader := bytes.NewReader([]byte(""))
+	headersHandler := func(headers []string) ([]string, error) {
+		return headers, nil
+	}
+	rowHandler := func(headers, columns []string) error {
+		return nil
+	}
+	err := ForEachCSVRow(headersHandler, rowHandler, reader)
+	if err == nil {
+		t.Fatal("expected err not to be nil")
+	}
+	if err.Error() != "EOF" {
+		t.Errorf(`expected "EOF", got "%s"`, err.Error())
 	}
 }

@@ -41,21 +41,20 @@ func ForEachCSVRow(headersHandler CSVHeadersHandler, rowHandler CSVRowHandler, r
 			return
 		}
 	}
-	if rowHandler != nil {
-		for {
-			var columns []string
-			columns, err = csv.Read()
-			if err != nil {
-				if err == io.EOF {
-					err = nil
-				}
-				break
+	for {
+		var columns []string
+		columns, err = csv.Read()
+		if err != nil {
+			if err == io.EOF {
+				err = nil
 			}
+			return
+		}
+		if rowHandler != nil {
 			err = rowHandler(headers, columns)
 			if err != nil {
-				break
+				return
 			}
 		}
 	}
-	return
 }
