@@ -5,13 +5,14 @@ package money
 import (
 	"encoding/xml"
 	"fmt"
+	"parasaurolophus/go/utilities"
 	"strconv"
 )
 
 // Implementation of Money interface.
 type monetaryValue struct {
 	value  float64
-	digits int
+	digits uint
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -19,7 +20,7 @@ type monetaryValue struct {
 
 // Return the number of digits to the right of the decimal point when
 // representing m in a text-based format.
-func (m monetaryValue) GetDigits() int {
+func (m monetaryValue) GetDigits() uint {
 	return m.digits
 }
 
@@ -30,13 +31,8 @@ func (m monetaryValue) GetValue() float64 {
 
 // Update the number of digits to the right of the decimal point when
 // representing m in a text-based format.
-func (m *monetaryValue) SetDigits(digits int) (err error) {
-	if digits < 0 {
-		err = fmt.Errorf("negative number of digits specified: %d", digits)
-		return
-	}
+func (m *monetaryValue) SetDigits(digits uint) {
 	m.digits = digits
-	return
 }
 
 // Update the numeric value of m.
@@ -47,13 +43,12 @@ func (m *monetaryValue) SetValue(value float64) {
 ///////////////////////////////////////////////////////////////////////////////
 // Implement fmt.Scanner
 
-// Set m's value to the float64 represented by the given fmt.ScanState.
-//
+// Set m's value to the JSON number represented by the given fmt.ScanState.
 // Returns nil if m's value was successfully parsed, an error if parsing the
-// contents of the given fmt.ScanState as a float64 fails. The value of m is set
-// to 0.0 if error is non-nil.
+// contents of the given fmt.ScanState as a JSON number fails. The value of m is
+// set to 0.0 if error is non-nil.
 func (m *monetaryValue) Scan(state fmt.ScanState, _ rune) (err error) {
-	token, err := state.Token(true, MakeFloatTokenTest())
+	token, err := state.Token(true, utilities.MakeJSONNumberTokenTest())
 	if err != nil {
 		return
 	}
@@ -66,7 +61,7 @@ func (m *monetaryValue) Scan(state fmt.ScanState, _ rune) (err error) {
 
 // Return the string representation of m's value.
 func (m monetaryValue) String() string {
-	return strconv.FormatFloat(m.value, 'f', m.digits, 64)
+	return strconv.FormatFloat(m.value, 'f', int(m.digits), 64)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
