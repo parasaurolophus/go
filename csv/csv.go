@@ -1,9 +1,10 @@
 // Copyright Kirk Rader 2024
 
-package utilities
+package csv
 
 import (
 	"encoding/csv"
+	"fmt"
 	"io"
 )
 
@@ -12,7 +13,7 @@ type (
 	// Type of function used to process the first row of a CSV file.
 	CSVHeadersHandler func(headers []string) ([]string, error)
 
-	// Type of function used to process each non-header row in a CSV file.
+	// Type of function used to process each subsequent row in a CSV file.
 	CSVRowHandler func(headers, columns []string) error
 )
 
@@ -21,7 +22,12 @@ type (
 // file and what it returns will be passed as the first argument to each
 // subsequent invocation of rowHandler. If headersHandler is nil, the first
 // argument to each invocation of rowHandler will be nil.
-func ForCSVReader(headersHandler CSVHeadersHandler, rowHandler CSVRowHandler, reader io.Reader) (err error) {
+func ForEachCSVRow(headersHandler CSVHeadersHandler, rowHandler CSVRowHandler, reader io.Reader) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic in CSV handler: %v", r)
+		}
+	}()
 	csv := csv.NewReader(reader)
 	csv.TrimLeadingSpace = true
 	var headers []string

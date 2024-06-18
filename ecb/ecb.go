@@ -7,7 +7,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
-	"parasaurolophus/go/utilities"
+	"parasaurolophus/go/csv"
 	"slices"
 	"strconv"
 	"time"
@@ -93,7 +93,7 @@ func ParseCSV(reader io.Reader) (Data, error) {
 		data = append(data, d...)
 		return nil
 	}
-	err := utilities.ForCSVReader(headersHandler, rowHandler, reader)
+	err := csv.ForEachCSVRow(headersHandler, rowHandler, reader)
 	if err != nil {
 		return nil, err
 	}
