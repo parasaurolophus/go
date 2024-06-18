@@ -4,6 +4,7 @@ package zip
 
 import (
 	"archive/zip"
+	"fmt"
 	"io"
 	"os"
 	"parasaurolophus/go/common_test"
@@ -115,5 +116,23 @@ func TestForEachZipEntryPanic(t *testing.T) {
 	}
 	if err.Error() != "ZipHandler panic: deliberate" {
 		t.Errorf(`expected "ZipHandler panic: deliberate", got "%s"`, err.Error())
+	}
+}
+
+func TestForEachZipEntryError(t *testing.T) {
+	embedded, err := common_test.TestData.Open("testdata/eurofxref.zip")
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	defer embedded.Close()
+	handler := func(entry *zip.File) error {
+		return fmt.Errorf("deliberate")
+	}
+	err = ForEachZipEntryFromReader(handler, embedded)
+	if err == nil {
+		t.Fatal("expected err not to be nil")
+	}
+	if err.Error() != "deliberate" {
+		t.Errorf(`expected "deliberate", got "%s"`, err.Error())
 	}
 }
