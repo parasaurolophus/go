@@ -31,7 +31,7 @@ func TestFetchDailyCSV(t *testing.T) {
 		}
 		return
 	}
-	err = z.ForZipReader(handler, readCloser)
+	err = z.ForEachZipEntryFromReader(handler, readCloser)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -72,7 +72,7 @@ func TestParseDailyCSV(t *testing.T) {
 		}
 		return
 	}
-	err = z.ForZipReader(handler, zipFile)
+	err = z.ForEachZipEntryFromReader(handler, zipFile)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -98,7 +98,7 @@ func TestParseHistoricalCSV(t *testing.T) {
 		}
 		return
 	}
-	err = z.ForZipReader(handler, zipFile)
+	err = z.ForEachZipEntryFromReader(handler, zipFile)
 	if err != nil {
 		t.Fatal(err.Error())
 	}

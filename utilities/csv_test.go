@@ -36,7 +36,7 @@ func TestForCSVReader(t *testing.T) {
 		err = ForCSVReader(headersHandler, rowHandler, reader)
 		return
 	}
-	err = z.ForZipReader(zipHandler, embedded)
+	err = z.ForEachZipEntryFromReader(zipHandler, embedded)
 	if err != nil {
 		t.Fatal(err.Error())
 	}

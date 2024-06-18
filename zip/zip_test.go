@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-func TestForZipFile(t *testing.T) {
+func TestForEachZipEntryFromFile(t *testing.T) {
 	embedded, err := common_test.TestData.Open("testdata/eurofxref.zip")
 	if err != nil {
 		t.Fatal(err.Error())
@@ -51,7 +51,7 @@ func TestForZipFile(t *testing.T) {
 		totalSize += len(b)
 		return
 	}
-	err = ForZipFile(handler, file)
+	err = ForEachZipEntryFromFile(handler, file)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -63,7 +63,7 @@ func TestForZipFile(t *testing.T) {
 	}
 }
 
-func TestForZipReader(t *testing.T) {
+func TestForEachZipEntryFromReader(t *testing.T) {
 	embedded, err := common_test.TestData.Open("testdata/eurofxref.zip")
 	if err != nil {
 		t.Fatal(err.Error())
@@ -88,7 +88,7 @@ func TestForZipReader(t *testing.T) {
 		totalSize += len(b)
 		return
 	}
-	err = ForZipReader(handler, embedded)
+	err = ForEachZipEntryFromReader(handler, embedded)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -97,5 +97,23 @@ func TestForZipReader(t *testing.T) {
 	}
 	if totalSize < 1 {
 		t.Fatalf("expected at least 1, got %d", totalSize)
+	}
+}
+
+func TestForEachZipEntryPanic(t *testing.T) {
+	embedded, err := common_test.TestData.Open("testdata/eurofxref.zip")
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	defer embedded.Close()
+	handler := func(entry *zip.File) error {
+		panic("deliberate")
+	}
+	err = ForEachZipEntryFromReader(handler, embedded)
+	if err == nil {
+		t.Fatal("expected err not to be nil")
+	}
+	if err.Error() != "ZipHandler panic: deliberate" {
+		t.Errorf(`expected "ZipHandler panic: deliberate", got "%s"`, err.Error())
 	}
 }

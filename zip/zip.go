@@ -4,6 +4,7 @@ package zip
 
 import (
 	"archive/zip"
+	"fmt"
 	"io"
 	"os"
 )
@@ -11,23 +12,29 @@ import (
 // Type of function used to process each entry in a zip archive.
 type ZipHandler func(*zip.File) error
 
-// Apply the given handler to each entry in the given zip file.
-func ForEachZipEntry(handler ZipHandler, readerAt io.ReaderAt, size int64) error {
+// Apply the given handler to each entry in the given zip file. Terminate the
+// loop upon first error.
+func ForEachZipEntry(handler ZipHandler, readerAt io.ReaderAt, size int64) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("ZipHandler panic: %v", r)
+		}
+	}()
 	zipReader, err := zip.NewReader(readerAt, size)
 	if err != nil {
-		return err
+		return
 	}
 	for _, entry := range zipReader.File {
 		err = handler(entry)
 		if err != nil {
-			return err
+			return
 		}
 	}
-	return nil
+	return
 }
 
 // Apply the given handler to each entry in the given zip archive.
-func ForZipFile(handler ZipHandler, file *os.File) error {
+func ForEachZipEntryFromFile(handler ZipHandler, file *os.File) error {
 	info, err := file.Stat()
 	if err != nil {
 		return err
@@ -36,7 +43,7 @@ func ForZipFile(handler ZipHandler, file *os.File) error {
 }
 
 // Apply the given handler to each entry in the given zip archive.
-func ForZipReader(handler ZipHandler, reader io.Reader) error {
+func ForEachZipEntryFromReader(handler ZipHandler, reader io.Reader) error {
 	file, err := os.CreateTemp(os.TempDir(), "ForZipReader")
 	if err != nil {
 		return err
@@ -52,5 +59,5 @@ func ForZipReader(handler ZipHandler, reader io.Reader) error {
 	if err != nil {
 		return err
 	}
-	return ForZipFile(handler, file)
+	return ForEachZipEntryFromFile(handler, file)
 }
