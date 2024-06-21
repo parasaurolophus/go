@@ -1,4 +1,4 @@
-# What Your CS Professor Might Have Failed to Tell You
+# Things Your CS Professor Might Have Failed to Tell You
 
 ## All Programming Languages Are Modeled on the Lambda Calculus
 
