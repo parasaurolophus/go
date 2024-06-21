@@ -165,7 +165,7 @@ int main(int argc, char **argv)
 ```
 
 That program defines and invokes the function `f`, which takes an array of
-integers and adds 1 to each element, using C's standard idiom for arrys
+integers and adds 1 to each element, using C's standard idiom for arrays
 involving "pointers" and "pointer arithmetic". The programm then checks the
 contents of the array after `f` returns, exiting with a status code indicating
 failure corresponding to any element whose value is incorrect or with a status
@@ -429,18 +429,18 @@ format for every program, e.g. zero-padding for alignment of various sections
 in memory.
 
 The corresponding disassembled Go executable (not shown) is 104,775 lines long,
-an increase of slightly over three (3) orders of magnitude over that for the C
+an increase of three (3) orders of magnitude over that for the C
 executable. It is so very much larger because even the most trivial Go program
 must drag in library dependencies and include large amounts of
 application-level support for garbage collection, non-triveal data management
 for built-in constructs like _slices_ (elastic sized views of fixed size
 arrays), and so on. In short, the conveniences provided by languages like Go
-comes at a very high price in terms of memory utilization and run time
+come at a very high price in terms of memory utilization and run time
 performance.
 
 A careful reader might claim that the comparison between the two programs is
 not fair, because (unlike any real world example), the given C program does not
-depend on a single standard library function (note the lack of any any
+depend on any standard library functions (note the lack of any
 `#include` statements) while the Go program depends on the `os` package (in
 order to invoke `os.Exit`). Similarly, those familiar with the semantics of
 both C and Go will point out how much richer the functionality of Go's slices
@@ -452,14 +452,14 @@ equivalent functionality directly in assembly language as can be seen easily
 from the output of `objdump`[<sup>3</sup>](#risc). A _pointer_ in C is
 literally just the address of a memory cell, which can be manipulated using
 arithmetic operations just as one would when writing a program in assembly
-language that needed to access successive values stored in RAM.
+language that needed to access data stored in successive RAM locations.
 
 By contrast, Go's semantics result in even the simplest program incurring very
 substantial overhead, whether or not that overhead is particularly useful for
 the given program. Many real-world C programs have no need to depend on library
 code that is much bigger than a few scanning, formatting and memory management
 functions from `stdio.h` and `stdlib.h`. Even such programs would be orders of
-magnitude smaller and more efficient at run time than their corresponding Go
+magnitude smaller and more efficient at run time compared to their corresponding Go
 programs. Programmers should be conscious of the trade-offs of the
 "convenience" of not having to keep track of the length of arrays and not
 having to remember to call `free` (or, in C++, `delete`) from time to time.
@@ -507,9 +507,10 @@ can perform as well or better, while consuming less power and generating less
 heat, compared to the desktop CPU's of yore (i.e. not so many years ago).
 
 <a id="no-really"><sup>4</sup></a> Back in the day, the author of this document
-has written entire mission-critical applications in 680x0 and 80x86 assembly
+wrote entire mission-critical applications in 680x0 and 80x86 assembly
 languages in scientific, aerospace and defense domains where bugs could cost
 lives or cause billions of dollars' worth of damage. This was during the same
 time in which he was a member of teams doing R&D in the first AI boom of the
 1980's, developing machine learning algorithms and expert systems in various
-dialects of Lisp, Smalltalk and Prolog. No, really.)
+dialects of Lisp, Smalltalk and Prolog. He has continued to practice what
+is preached here throughout the intervening decades.
