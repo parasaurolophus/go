@@ -1,4 +1,4 @@
-# What Your CS Professor Might Have Failed to Tell You
+# Things Your CS Professor Might Have Failed to Tell You
 
 ## All Programming Languages Are Modeled on the Lambda Calculus
 
@@ -190,7 +190,7 @@ int main(int argc, char **argv)
 ```
 
 That program defines and invokes the function `f`, which takes an array of
-integers and adds 1 to each element, using C's standard idiom for arrys
+integers and adds 1 to each element, using C's standard idiom for arrays
 involving "pointers" and "pointer arithmetic". The programm then checks the
 contents of the array after `f` returns, exiting with a status code indicating
 failure corresponding to any element whose value is incorrect or with a status
@@ -496,14 +496,14 @@ equivalent functionality directly in assembly language as can be seen easily
 from the output of `objdump`[<sup>3</sup>](#risc). A _pointer_ in C is
 literally just the address of a memory cell, which can be manipulated using
 arithmetic operations just as one would when writing a program in assembly
-language that needed to access successive values stored in RAM.
+language that needed to access data stored in successive RAM locations.
 
 By contrast, Go's semantics result in even the simplest program incurring very
 substantial overhead, whether or not that overhead is particularly useful for
 the given program. Many real-world C programs have no need to depend on library
 code that is much bigger than a few scanning, formatting and memory management
 functions from `stdio.h` and `stdlib.h`. Even such programs would be orders of
-magnitude smaller and more efficient at run time than their corresponding Go
+magnitude smaller and more efficient at run time compared to their corresponding Go
 programs. Programmers should be conscious of the trade-offs of the
 "convenience" of not having to keep track of the length of arrays and not
 having to remember to call `free` (or, in C++, `delete`) from time to time.
