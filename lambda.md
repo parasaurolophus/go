@@ -486,7 +486,7 @@ The corresponding disassembled Go executable (not shown) is 134,668 lines long,
 an increase of three (3) orders of magnitude over that for the C executable. It
 is so very much larger because even the most trivial Go program must drag in
 library dependencies and include large amounts of application-level support for
-garbage collection, non-triveal data management for built-in constructs like
+garbage collection, non-trivial data management for built-in constructs like
 _slices_ (elastic sized views of fixed size arrays), and so on. In short, the
 conveniences provided by languages like Go come at a very high price in terms
 of memory utilization and run time performance.
