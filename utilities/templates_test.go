@@ -4,6 +4,8 @@ package utilities
 
 import (
 	"encoding/json"
+	"fmt"
+	"os"
 	"testing"
 )
 
@@ -12,20 +14,32 @@ func TestExecuteTemplate(t *testing.T) {
 		Foo int    `json:"foo"`
 		Bar string `json:"bar"`
 	}
-	var datum Datum
-	payload := `{"foo":1,"bar":"one"}`
-	err := json.Unmarshal([]byte(payload), &datum)
+	var arguments []Datum
+	payload := `[{"foo":1,"bar":"one"},{"foo":2,"bar":"two"}]`
+	err := json.Unmarshal([]byte(payload), &arguments)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 	text := `Foo is {{.Foo}}, Bar is "{{.Bar}}"`
-	actual, err := ExecuteTemplate("", text, datum)
+	actual, err := ExecuteTemplate("", text, arguments...)
 	if err != nil {
-		t.Error(err.Error())
+		t.Fatal(err.Error())
 	}
-	expected := `Foo is 1, Bar is "one"`
-	if actual != expected {
-		t.Errorf(`expected "%s", got "%s"`, expected, actual)
+	if len(actual) != 2 {
+		t.Fatalf("expected 2, got %d", len(actual))
+	}
+	expected1 := `Foo is 1, Bar is "one"`
+	if actual[0] != expected1 {
+		t.Errorf(`expected "%s", got "%s"`, expected1, actual[0])
+	}
+	expected2 := `Foo is 2, Bar is "two"`
+	if actual[1] != expected2 {
+		t.Errorf(`expected "%s", got "%s"`, expected2, actual[1])
+	}
+	actual, err = ExecuteTemplate("", text, struct{ Baz float64 }{Baz: 4.2})
+	fmt.Printf("\"%s\"\n", actual[0])
+	if err == nil {
+		t.Errorf("expected err not to be nil")
 	}
 }
 
@@ -36,18 +50,24 @@ func TestExecuteTemplates(t *testing.T) {
 	defer close(parameters)
 	sync := make(chan bool)
 	defer close(sync)
-	testHandler := func(_ string, err error) {
+	testHandler := func(result string, err error) {
 		if err != nil {
 			errorCount++
+			fmt.Fprintf(
+				os.Stderr,
+				"Result: \"%s\", Error: \"%s\"\n",
+				result, err.Error(),
+			)
 			return
 		}
+		fmt.Printf("Result: \"%s\"\n", result)
 		successCount++
 	}
 	data := []TemplateParameters{
 		{
 			Name: "",
 			Text: `Foo is {{.Foo}}, Bar is "{{.Bar}}"`,
-			Datum: struct {
+			Argument: struct {
 				Foo int
 				Bar string
 			}{
@@ -59,7 +79,7 @@ func TestExecuteTemplates(t *testing.T) {
 		{
 			Name: "",
 			Text: `Foo is {{.Foo}}, Bar is "{{.Bar}"`,
-			Datum: struct {
+			Argument: struct {
 				Foo int
 				Bar string
 			}{
@@ -71,7 +91,7 @@ func TestExecuteTemplates(t *testing.T) {
 		{
 			Name: "",
 			Text: `The answer is {{.Answer}}`,
-			Datum: struct {
+			Argument: struct {
 				Answer float64
 			}{
 				Answer: 42.0,
@@ -79,10 +99,10 @@ func TestExecuteTemplates(t *testing.T) {
 			Handler: testHandler,
 		},
 		{
-			Name:    "",
-			Text:    "",
-			Datum:   nil,
-			Handler: func(string, error) { sync <- true },
+			Name:     "",
+			Text:     "",
+			Argument: nil,
+			Handler:  func(string, error) { sync <- true },
 		},
 	}
 	go ExecuteTemplates(parameters)

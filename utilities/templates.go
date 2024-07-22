@@ -11,28 +11,36 @@ type (
 	TemplateResultHandler func(string, error)
 
 	TemplateParameters struct {
-		Name    string
-		Text    string
-		Datum   any
-		Handler TemplateResultHandler
+		Name     string
+		Text     string
+		Argument any
+		Handler  TemplateResultHandler
 	}
 
 	TemplateParametersChannel chan TemplateParameters
 )
 
-func ExecuteTemplate(name, text string, datum any) (string, error) {
+func ExecuteTemplate[T any](name, text string, arguments ...T) (results []string, err error) {
+	results = make([]string, len(arguments))
 	tmplt, err := template.New(name).Parse(text)
 	if err != nil {
-		return "", err
+		return
 	}
 	buffer := bytes.Buffer{}
-	err = tmplt.Execute(&buffer, datum)
-	return buffer.String(), err
+	for index, argument := range arguments {
+		buffer.Reset()
+		err = tmplt.Execute(&buffer, argument)
+		if err != nil {
+			return
+		}
+		results[index] = buffer.String()
+	}
+	return
 }
 
 func ExecuteTemplates(channel TemplateParametersChannel) {
 	for parameters := range channel {
-		result, err := ExecuteTemplate(parameters.Name, parameters.Text, parameters.Datum)
-		parameters.Handler(result, err)
+		results, err := ExecuteTemplate(parameters.Name, parameters.Text, parameters.Argument)
+		parameters.Handler(results[0], err)
 	}
 }
