@@ -1,24 +1,42 @@
-// Copyright Kirk Rader 2024
+// Copyright 2024 Kirk Rader
 
 package utilities
 
-// Invoke asyncFunction for each value received on in, sending the result on
-// out. If asyncFunction panics, invoke panicHandler and then send T's zero
-// value to out.
-func Async[T any](asyncFunction func(T) T, in chan T, out chan T, panicHandler func(recovered any)) {
-	defer close(out)
-	for value := range in {
-		result := func(x T) (y T) {
-			defer func() {
-				if r := recover(); r != nil {
-					if panicHandler != nil {
-						panicHandler(r)
-					}
-				}
-			}()
-			y = asyncFunction(x)
-			return
-		}(value)
-		out <- result
-	}
+import (
+	"io"
+	"sync"
+)
+
+// Start a goroutine which will invoke handler for each item sent to the values
+// channel until it is closed. The goroutine will close the await channel
+// before terminating.
+func NewWorker[V any](handler func(V), log io.Writer) (values chan<- V, await <-chan any) {
+	v := make(chan V)
+	values = v
+	a := make(chan any)
+	await = a
+	go func() {
+		defer close(a)
+		for value := range v {
+			Invoke(handler, value, log)
+		}
+	}()
+	return
+}
+
+// Start a goroutine which will invoke handler for each item sent to the values
+// channel until it is closed. The await's count will be incremented by for
+// this function returns, and the goroutine will decrement await's count before
+// terminating.
+func NewWorkerWaitGroup[V any](handler func(V), await *sync.WaitGroup, log io.Writer) (values chan<- V) {
+	v := make(chan V)
+	values = v
+	await.Add(1)
+	go func() {
+		defer await.Done()
+		for value := range v {
+			Invoke(handler, value, log)
+		}
+	}()
+	return
 }

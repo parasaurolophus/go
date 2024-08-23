@@ -1,31 +1,44 @@
-# parasaurolophus/go/utilities
+_Copyright 2024 Kirk Rader_
 
-Output of `go doc -all`:
+# parasaurolophus/utilities
 
 ```
-package utilities // import "parasaurolophus/go/utilities"
+package utilities // import "parasaurolophus/utilities"
 
 
 FUNCTIONS
 
-func Async[T any](asyncFunction func(T) T, in chan T, out chan T, panicHandler func(recovered any))
-    Invoke asyncFunction for each value received on in, sending the result on
-    out. If asyncFunction panics, invoke panicHandler and then send T's zero
-    value to out.
+func Invoke[T any](handler func(T), value T, log io.Writer)
+    Trap and log panics.
 
-func Fetch(url string) (readCloser io.ReadCloser, err error)
-    Fetch a document from the given URL.
+func NewWorker[V any](handler func(V), log io.Writer) (values chan<- V, await <-chan any)
+    Start a goroutine which will invoke handler for each item sent to the values
+    channel until it is closed. The goroutine will close the await channel
+    before terminating.
 
-func FilterMapKeys[K comparable, V any](m map[K]V, keepKeys ...K) map[K]V
-    Return a shallow copy of m, with only the keys specified by keepKeys.
+func NewWorkerWaitGroup[V any](handler func(V), await *sync.WaitGroup, log io.Writer) (values chan<- V)
+    Start a goroutine which will invoke handler for each item sent to the values
+    channel until it is closed. The await's count will be incremented by for
+    this function returns, and the goroutine will decrement await's count before
+    terminating.
 
-func MakeJSONNumberTokenTest() func(rune) bool
-    Return a closure that can be used with fmt.ScanState.Token to convert
-    the text representation of a number to a float64 according to JSON number
-    syntax.
 
-func MergeMaps[K comparable, V any](maps ...map[K]V) map[K]V
-    Return a map that combines the key / value pairs from all the given ones.
-    The maps are processed in the given order. If the same key appears more than
-    once, the value in the result will be the last one from the parameter list.
+TYPES
+
+type Watchdog struct {
+        // Has unexported fields.
+}
+    Similar to standard time.Timer, but with the ability to suppress invocations
+    of the timeout handler by sending values to a reset channel.
+
+func NewWatchdog(interval time.Duration, timeout func()) (watchdog Watchdog, reset chan<- any)
+    Construct a Watchdog. The timeout handler will be invoked periodically in
+    its own goroutine except when suppressed by sending values to the given
+    reset channel. Note that the time until the next timeout is reset to
+    time.Now() each time a value is on the reset channel, so the exact frequency
+    of timeouts is erratic, as determined by the base interval and the times at
+    which a watchdog timer is reset.
+
+func (watchdog Watchdog) Stop()
+    Stop the watchdog and block until it exits.
 ```

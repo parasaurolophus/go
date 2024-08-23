@@ -1,71 +1,75 @@
-// Copyright Kirk Rader 2024
+// Copyright 2024 Kirk Rader
 
-package utilities
+package utilities_test
 
 import (
 	"bytes"
-	"context"
-	"encoding/json"
-	"parasaurolophus/go/logging"
+	"parasaurolophus/utilities"
+	"sync"
 	"testing"
 )
 
-func TestAsync(t *testing.T) {
-	buffer := bytes.Buffer{}
-	options := logging.LoggerOptions{
-		BaseTags: []string{t.Name()},
+func TestNewWorker(t *testing.T) {
+	log := new(bytes.Buffer)
+	actual := 0
+	handler := func(n int) {
+		actual += n
 	}
-	logger := logging.New(&buffer, &options)
-	type S struct {
-		Value int
+	values, await := utilities.NewWorker(handler, log)
+	values <- 1
+	values <- 1
+	close(values)
+	<-await
+	if actual != 2 {
+		t.Errorf("expected 2, got %d", actual)
 	}
-	asyncFunction := func(s *S) *S {
-		if s.Value%2 == 0 {
-			s.Value += 1
-			return s
-		}
-		panic("odd")
+	s := log.String()
+	if len(s) != 0 {
+		t.Errorf(`expected no errors to be logged, got "%s"`, s)
 	}
-	in := make(chan *S)
-	out := make(chan *S)
-	defer close(out)
-	panicHandler := func(r any) {
-		logger.Always(
-			context.Background(),
-			nil,
-			logging.RECOVERED, r,
-			logging.TAGS, t.Name(),
-			logging.STACKTRACE, nil,
-		)
+}
+
+func TestNewWorkerWaitGroup(t *testing.T) {
+	log := new(bytes.Buffer)
+	actual := 0
+	handler := func(n int) {
+		actual += n
 	}
-	go Async(asyncFunction, out, in, panicHandler)
-	s := S{Value: 0}
-	out <- &s
-	v := <-in
-	if v == nil {
-		t.Fatalf("expected result not to be nil")
+	waitGroup := sync.WaitGroup{}
+	values := make([]chan<- int, 3)
+	for i := range 3 {
+		values[i] = utilities.NewWorkerWaitGroup(handler, &waitGroup, log)
 	}
-	if v != &s {
-		t.Fatalf("expected v to be &s")
+	for _, v := range values {
+		v <- 1
+		close(v)
 	}
-	if s.Value != 1 {
-		t.Errorf("expected 1, got %d", s.Value)
+	waitGroup.Wait()
+	if actual != len(values) {
+		t.Errorf("expected %d, got %d", len(values), actual)
 	}
-	out <- &s
-	v = <-in
-	if v != nil {
-		t.Errorf("expected nil, got %v", v)
+	s := log.String()
+	if len(s) != 0 {
+		t.Errorf(`expected no errors to be logged, got "%s"`, s)
 	}
-	if s.Value != 1 {
-		t.Errorf("expected 1, got %d", s.Value)
+}
+
+func TestNeworkerTrapPanic(t *testing.T) {
+	log := new(bytes.Buffer)
+	actual := 0
+	handler := func(n int) {
+		panic("deliberate")
 	}
-	b := buffer.Bytes()
-	entry := map[string]any{}
-	err := json.Unmarshal(b, &entry)
-	if err != nil {
-		t.Fatal(err.Error())
+	values, await := utilities.NewWorker(handler, log)
+	values <- 1
+	values <- 1
+	close(values)
+	<-await
+	if actual != 0 {
+		t.Errorf("expected 0, got %d", actual)
 	}
-	if entry["recovered"] != "odd" {
-		t.Errorf(`expected entry to have "recovered" field value of "odd", got %v`, entry["recovered"])
+	s := log.String()
+	if len(s) == 0 {
+		t.Error(`expected errors to be logged`)
 	}
 }
