@@ -16,18 +16,15 @@ func TestProcessBatch(t *testing.T) {
 			producers[i%len(producers)] <- i
 		}
 	}
-	utilities.ProcessBatch(
-		3,
-		generate,
-		func(input int) float64 {
-			return float64(input) / 2.0
-		},
-		func(output float64) {
-			actual += output
-		},
-	)
+	transfrom := func(input int) float64 {
+		return float64(input) / 2.0
+	}
+	consume := func(output float64) {
+		actual += output
+	}
+	utilities.ProcessBatch(3, generate, transfrom, consume)
 	if actual != 18 {
-		t.Errorf("expected 18, got %f", actual)
+		t.Errorf("expected 28, got %f", actual)
 	}
 }
 

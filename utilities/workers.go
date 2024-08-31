@@ -7,8 +7,19 @@ import (
 	"time"
 )
 
+// ---------------------------------------------------------------------------
 // Close all of the given values channels then wait for the given group to
-// signal that they all have exited cleanly.
+// signal that all workers have exited cleanly. For example:
+//
+//	{
+//	  values, await := StartWorkers(n, handler)
+//	  defer CloseAllAndWait(values, await)
+//	  for i, value := range data {
+//	    values[i%n] <- value
+//	  }
+//	}
+//
+// ---------------------------------------------------------------------------
 func CloseAllAndWait[V any](values []chan<- V, await *sync.WaitGroup) {
 	for _, v := range values {
 		close(v)
@@ -16,49 +27,98 @@ func CloseAllAndWait[V any](values []chan<- V, await *sync.WaitGroup) {
 	await.Wait()
 }
 
+// ---------------------------------------------------------------------------
 // Close the given values channel then wait for the given await channel to be
-// closed.
+// closed. For example:
+//
+//	{
+//	  values, await := StartWorker(handler)
+//	  defer CloseAndWait(values, await)
+//	  for _, value := range data {
+//	    values <- value
+//	  }
+//	}
+//
+// ---------------------------------------------------------------------------
 func CloseAndWait[V any](values chan<- V, await <-chan any) {
 	close(values)
 	<-await
 }
 
-// Start n+1 goroutines and wait for them all to complete after invoking the
-// given generator function. The generator function must send values in a
-// round-robin fashion to the set of values it is passed. The first n worker
-// goroutines will send the result of invoking the given transformer function
-// to the last goroutine, which invokes the given consumer function.
+// ---------------------------------------------------------------------------
+// Process items in a set of data concurrently. Specifically, start n+1
+// goroutines and wait for them all to complete after invoking the given
+// generator function. The generator function must send input values in a
+// round-robin fashion to the set of transformer channels it is passed. The
+// transformer goroutines will send the result of invoking the given transform
+// function to the consumer goroutine, which invokes the given consume
+// function:
 //
-// ```mermaid
-// ```
+//	                   +-----------+
+//	              +-->>| transform |----+
+//	              |    +-----------+    |
+//	              |          .          |
+//	+----------+  |          .          |    +---------+
+//	| generate |--+     concurrent      |-->>| consume |
+//	+----------+  |     goroutines      |    +---------+
+//	              |          .          |
+//	              |          .          |
+//	              |    +-----------+    |
+//	              +-->>| transform |----+
+//	                   +-----------+
 //
-// See CloseAndWait, CloseAllAndWait, StartWorker, StartWorkers
+// Note that this function will hang if any of the generate, transform or
+// consume functions do not return. If your transform function invokes some SDK
+// function or API that can hang, consier the use of WithTimeLimit to allow the
+// batch to run to completion even if some operations would otherwise block it
+// (but then be aware of the consequences of resulting resource leaks).
+//
+// See CloseAndWait, CloseAllAndWait, StartWorker, StartWorkers,
+// TestProcessBatch
+// ---------------------------------------------------------------------------
 func ProcessBatch[Input any, Output any](
 	n int,
-	generate func([]chan<- Input),
+	generate func(transformers []chan<- Input),
 	transform func(Input) Output,
 	consume func(Output),
 ) {
 
+	// start a goroutine that will apply the consume function to each value
+	// sent to its channel
 	consumer, awaitConsumer := StartWorker(consume)
 	defer CloseAndWait(consumer, awaitConsumer)
-	func() {
-		produce := func(request Input) {
-			consumer <- transform(request)
-		}
-		producers, awaitProducers := StartWorkers(n, produce)
-		defer CloseAllAndWait(producers, awaitProducers)
-		generate(producers)
-	}()
+
+	// wrap the transform function in a closure that will send a given
+	// transformed input to the consumer channel
+	produce := func(request Input) {
+		consumer <- transform(request)
+	}
+
+	// start n goroutines each of which will call the produce closure for each
+	// value sent to its channel
+	transformers, awaitTransformers := StartWorkers(n, produce)
+	defer CloseAllAndWait(transformers, awaitTransformers)
+
+	// generate must send values of type Input to the channels it is
+	// passed,then return
+	generate(transformers)
 }
 
+// ---------------------------------------------------------------------------
 // Start a goroutine which will invoke the given handler for each item sent to
-// the returned values channel until it is closed at which time it will close
+// the returned values channel, until it is closed, at which time it will close
 // the await channel before exiting.
 //
-// See:
-// CloseAndWait[V any](chan<- V, <-chan any)
-// StartWorkers[V any](int, func(V))
+//	{
+//	  values, await := StartWorker(handler)
+//	  defer CloseAndWait(values, await)
+//	  for _, value := range data {
+//	    values <- value
+//	  }
+//	}
+//
+// See CloseAndWait, StartWorkers
+// ---------------------------------------------------------------------------
 func StartWorker[V any](handler func(V)) (values chan<- V, await <-chan any) {
 	v := make(chan V)
 	values = v
@@ -73,16 +133,24 @@ func StartWorker[V any](handler func(V)) (values chan<- V, await <-chan any) {
 	return
 }
 
+// ---------------------------------------------------------------------------
 // Start the specified number of goroutines, each of which will invoke the
 // given handler for each item sent to one of the returned values channels. The
 // returned wait group's counter will be set initially to the number of
 // goroutines specified by n. Each goroutine will decrement the returned wait
 // group's counter before terminating when the value channel to which it is
-// listening is closed. group's count
+// listening is closed. group's count. For example:
 //
-// See:
-// CloseAllAndWait[V any]([]chan<- V, *sync.WaitGroup)
-// StartWorker[V any](func(V))
+//	{
+//	  values, await := StartWorkers(n, handler)
+//	  defer CloseAllAndWait(values, await)
+//	  for i, value := range data {
+//	    values[i%n] <- value
+//	  }
+//	}
+//
+// See CloseAllAndWait, StartWorker
+// ---------------------------------------------------------------------------
 func StartWorkers[V any](n int, handler func(V)) (values []chan<- V, await *sync.WaitGroup) {
 	v := make([]chan V, n)
 	values = make([]chan<- V, n)
@@ -101,6 +169,7 @@ func StartWorkers[V any](n int, handler func(V)) (values []chan<- V, await *sync
 	return
 }
 
+// ---------------------------------------------------------------------------
 // Invoke fn asynchronously. Return its value if it completes within the
 // specified duration. Otherwise, return the value of calling the timeout
 // function.
@@ -109,9 +178,10 @@ func StartWorkers[V any](n int, handler func(V)) (values []chan<- V, await *sync
 // never completes, so use this function with caution. For example, it would be
 // reasonable to invoke WithTimeLimit in a console application, a lambda's
 // request handler function or any similar "one and done" flow. But Go provides
-// no mechanism for forcibly terminating a goroutine, so long-running services
-// should use this function (or any that involve goroutines that could possibly
-// hang) with caution.
+// no mechanism for forcibly terminating a goroutine, so long-running processes
+// should not use this function (or any that involve goroutines that could
+// possibly hang).
+// ---------------------------------------------------------------------------
 func WithTimeLimit[V any](fn func() V, timeout func() V, timeLimit time.Duration) V {
 	value := make(chan V)
 	timer := time.NewTimer(timeLimit)
