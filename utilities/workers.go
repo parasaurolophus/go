@@ -3,11 +3,14 @@
 package utilities
 
 import (
+	"encoding/csv"
+	"io"
 	"sync"
 	"time"
 )
 
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+//
 // Close all of the given values channels then wait for the given group to
 // signal that all workers have exited cleanly. For example:
 //
@@ -19,7 +22,7 @@ import (
 //	  }
 //	}
 //
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 func CloseAllAndWait[V any](values []chan<- V, await *sync.WaitGroup) {
 	for _, v := range values {
 		close(v)
@@ -27,7 +30,8 @@ func CloseAllAndWait[V any](values []chan<- V, await *sync.WaitGroup) {
 	await.Wait()
 }
 
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+//
 // Close the given values channel then wait for the given await channel to be
 // closed. For example:
 //
@@ -39,13 +43,61 @@ func CloseAllAndWait[V any](values []chan<- V, await *sync.WaitGroup) {
 //	  }
 //	}
 //
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
 func CloseAndWait[V any](values chan<- V, await <-chan any) {
 	close(values)
 	<-await
 }
 
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+//
+// Return a function for use as the generate parameter to ProcessBatch. The
+// returned function will invoke the given parse for each row of the given CSV
+// file, sending the result to the batch's transformers channels. Any errors
+// encountered along the way will be passed to the given errorHandler function.
+//
+// [See] ProcessBatch
+//
+// ----------------------------------------------------------------------------
+func MakeCSVGenerator(
+
+	reader *csv.Reader,
+	headers []string,
+	errorHandler func(error),
+
+) (
+
+	generator func([]chan<- map[string]string),
+	err error,
+
+) {
+
+	generator = func(transformers []chan<- map[string]string) {
+		var err error
+		row := 1
+		n := len(transformers)
+		for {
+			var columns []string
+			columns, err = reader.Read()
+			if err != nil {
+				if err != io.EOF {
+					errorHandler(err)
+				}
+				break
+			}
+			m := map[string]string{}
+			for i, h := range headers {
+				m[h] = columns[i]
+			}
+			transformers[(row-1)%n] <- m
+			row++
+		}
+	}
+	return
+}
+
+// ----------------------------------------------------------------------------
+//
 // Process items in a set of data concurrently. Specifically, start n+1
 // goroutines and wait for them all to complete after invoking the given
 // generator function. The generator function must send input values in a
@@ -67,15 +119,19 @@ func CloseAndWait[V any](values chan<- V, await <-chan any) {
 //	              +-->>| transform |----+
 //	                   +-----------+
 //
+// ProcessBatch will call the finish function after all itsworker goroutines
+// have terminated.
+//
 // Note that this function will hang if any of the generate, transform or
 // consume functions do not return. If your transform function invokes some SDK
 // function or API that can hang, consier the use of WithTimeLimit to allow the
 // batch to run to completion even if some operations would otherwise block it
 // (but then be aware of the consequences of resulting resource leaks).
 //
-// See CloseAndWait, CloseAllAndWait, StartWorker, StartWorkers,
+// [See] CloseAndWait, CloseAllAndWait, StartWorker, StartWorkers,
 // TestProcessBatch
-// ---------------------------------------------------------------------------
+//
+// ----------------------------------------------------------------------------
 func ProcessBatch[Input any, Output any](
 	n int,
 	generate func(transformers []chan<- Input),
@@ -104,7 +160,8 @@ func ProcessBatch[Input any, Output any](
 	generate(transformers)
 }
 
-// ---------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+//
 // Start a goroutine which will invoke the given handler for each item sent to
 // the returned values channel, until it is closed, at which time it will close
 // the await channel before exiting.
@@ -117,8 +174,9 @@ func ProcessBatch[Input any, Output any](
 //	  }
 //	}
 //
-// See CloseAndWait, StartWorkers
-// ---------------------------------------------------------------------------
+// [See] CloseAndWait, StartWorkers
+//
+// ----------------------------------------------------------------------------
 func StartWorker[V any](handler func(V)) (values chan<- V, await <-chan any) {
 	v := make(chan V)
 	values = v
@@ -134,6 +192,7 @@ func StartWorker[V any](handler func(V)) (values chan<- V, await <-chan any) {
 }
 
 // ---------------------------------------------------------------------------
+//
 // Start the specified number of goroutines, each of which will invoke the
 // given handler for each item sent to one of the returned values channels. The
 // returned wait group's counter will be set initially to the number of
@@ -149,7 +208,8 @@ func StartWorker[V any](handler func(V)) (values chan<- V, await <-chan any) {
 //	  }
 //	}
 //
-// See CloseAllAndWait, StartWorker
+// [See] CloseAllAndWait, StartWorker
+//
 // ---------------------------------------------------------------------------
 func StartWorkers[V any](n int, handler func(V)) (values []chan<- V, await *sync.WaitGroup) {
 	v := make([]chan V, n)
@@ -170,6 +230,7 @@ func StartWorkers[V any](n int, handler func(V)) (values []chan<- V, await *sync
 }
 
 // ---------------------------------------------------------------------------
+//
 // Invoke fn asynchronously. Return its value if it completes within the
 // specified duration. Otherwise, return the value of calling the timeout
 // function.
@@ -181,15 +242,16 @@ func StartWorkers[V any](n int, handler func(V)) (values []chan<- V, await *sync
 // no mechanism for forcibly terminating a goroutine, so long-running processes
 // should not use this function (or any that involve goroutines that could
 // possibly hang).
+//
 // ---------------------------------------------------------------------------
-func WithTimeLimit[V any](fn func() V, timeout func() V, timeLimit time.Duration) V {
+func WithTimeLimit[V any](fn func() V, timeout func(time.Time) V, timeLimit time.Duration) V {
 	value := make(chan V)
 	timer := time.NewTimer(timeLimit)
 	go func() { value <- fn() }()
 	select {
 	case v := <-value:
 		return v
-	case <-timer.C:
-		return timeout()
+	case t := <-timer.C:
+		return timeout(t)
 	}
 }

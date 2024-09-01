@@ -3,48 +3,107 @@
 package utilities_test
 
 import (
+	"bytes"
+	"embed"
+	"encoding/csv"
+	"fmt"
 	"parasaurolophus/utilities"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
 )
 
-func TestProcessBatch(t *testing.T) {
-	actual := 0.0
-	generate := func(producers []chan<- int) {
-		for i := range 9 {
-			producers[i%len(producers)] <- i
+//go:embed all:embedded
+var embedded embed.FS
+
+func TestProcessBatchHappyPath(t *testing.T) {
+	b, err := embedded.ReadFile("embedded/input.csv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader := bytes.NewReader(b)
+	csvReader := csv.NewReader(reader)
+	headers, err := csvReader.Read()
+	if err != nil {
+		t.Fatal(err)
+	}
+	errors := 0
+	actual := 0
+	errorHandler := func(error) {
+		errors += 1
+	}
+	generate, err := utilities.MakeCSVGenerator(csvReader, headers, errorHandler)
+	if err != nil {
+		t.Fatal(err)
+	}
+	transform := func(input map[string]string) (n int) {
+		col, ok := input["number"]
+		if !ok {
+			errorHandler(fmt.Errorf("%v has no value for \"number\"", input))
+			return
 		}
+		var err error
+		n, err = strconv.Atoi(col)
+		if err != nil {
+			errorHandler(err)
+		}
+		return
 	}
-	transfrom := func(input int) float64 {
-		return float64(input) / 2.0
-	}
-	consume := func(output float64) {
+	consume := func(output int) {
 		actual += output
 	}
-	utilities.ProcessBatch(3, generate, transfrom, consume)
-	if actual != 18 {
-		t.Errorf("expected 28, got %f", actual)
+	utilities.ProcessBatch(3, generate, transform, consume)
+	if actual != 15 {
+		t.Errorf("expected 15, got %d", actual)
+	}
+	if errors != 0 {
+		t.Errorf("expected no errors, got %d", errors)
 	}
 }
 
-func TestStartWorker(t *testing.T) {
-	actual := 0
-	lock := sync.Mutex{}
-	handler := func(n int) {
-		defer lock.Unlock()
-		lock.Lock()
-		actual += n
+func TestProcessBatchMalformed(t *testing.T) {
+	b, err := embedded.ReadFile("embedded/malformed.csv")
+	if err != nil {
+		t.Fatal(err)
 	}
-	func() {
-		values, await := utilities.StartWorker(handler)
-		defer utilities.CloseAndWait(values, await)
-		for i := range 3 {
-			values <- i
+	reader := bytes.NewReader(b)
+	csvReader := csv.NewReader(reader)
+	headers, err := csvReader.Read()
+	if err != nil {
+		t.Fatal(err)
+	}
+	errors := 0
+	actual := 0
+	errorHandler := func(error) {
+		errors += 1
+	}
+	generate, err := utilities.MakeCSVGenerator(csvReader, headers, errorHandler)
+	if err != nil {
+		t.Fatal(err)
+	}
+	transform := func(input map[string]string) (n int) {
+		col, ok := input["number"]
+		if !ok {
+			errorHandler(fmt.Errorf("%v has no value for \"number\"", input))
+			return
 		}
-	}()
-	if actual != 3 {
-		t.Errorf("expected 3, got %d", actual)
+		var err error
+		n, err = strconv.Atoi(col)
+		if err != nil {
+			errorHandler(err)
+		}
+		return
+	}
+	consume := func(output int) {
+		actual += output
+	}
+	utilities.ProcessBatch(3, generate, transform, consume)
+	if actual != 1 {
+		t.Errorf("expected 1, got %d", actual)
+	}
+	if errors != 1 {
+		t.Errorf("expected 1 error, got %d", errors)
 	}
 }
 
@@ -76,7 +135,7 @@ func TestWithTimeLimit(t *testing.T) {
 		time.Sleep(time.Millisecond * 100)
 		return 2
 	}
-	timeout := func() int {
+	timeout := func(time.Time) int {
 		return 0
 	}
 	if v := utilities.WithTimeLimit(fn1, timeout, time.Millisecond*50); v != 1 {
