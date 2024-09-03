@@ -9,15 +9,13 @@ import (
 	"fmt"
 	"parasaurolophus/utilities"
 	"strconv"
-	"sync"
 	"testing"
-	"time"
 )
 
 //go:embed all:embedded
 var embedded embed.FS
 
-func TestProcessBatchHappyPath(t *testing.T) {
+func TestProcessBatchCSVHappyPath(t *testing.T) {
 	inputData, err := embedded.ReadFile("embedded/input.csv")
 	if err != nil {
 		t.Fatal(err)
@@ -86,7 +84,7 @@ func TestProcessBatchHappyPath(t *testing.T) {
 	fmt.Println(string(outputData))
 }
 
-func TestProcessBatchInconsistent(t *testing.T) {
+func TestProcessBatchCSVInconsistent(t *testing.T) {
 	b, err := embedded.ReadFile("embedded/inconsistent.csv")
 	if err != nil {
 		t.Fatal(err)
@@ -143,7 +141,7 @@ func TestProcessBatchInconsistent(t *testing.T) {
 	}
 }
 
-func TestProcessBatchMalformed(t *testing.T) {
+func TestProcessBatchCSVMalformed(t *testing.T) {
 	b, err := embedded.ReadFile("embedded/malformed.csv")
 	if err != nil {
 		t.Fatal(err)
@@ -197,44 +195,5 @@ func TestProcessBatchMalformed(t *testing.T) {
 	}
 	if errors != 1 {
 		t.Errorf("expected 1 error, got %d", errors)
-	}
-}
-
-func TestStartWorkers(t *testing.T) {
-	actual := 0
-	lock := sync.Mutex{}
-	handler := func(n int) {
-		defer lock.Unlock()
-		lock.Lock()
-		actual += n
-	}
-	func() {
-		values, await := utilities.StartWorkers(3, 1, handler)
-		defer utilities.CloseAllAndWait(values, await)
-		for i := range len(values) {
-			values[i] <- i
-		}
-	}()
-	if actual != 3 {
-		t.Errorf("expected 3, got %d", actual)
-	}
-}
-
-func TestWithTimeLimit(t *testing.T) {
-	fn1 := func() int {
-		return 1
-	}
-	fn2 := func() int {
-		time.Sleep(time.Millisecond * 100)
-		return 2
-	}
-	timeout := func(time.Time) int {
-		return 0
-	}
-	if v := utilities.WithTimeLimit(fn1, timeout, time.Millisecond*50); v != 1 {
-		t.Errorf("expected 1, got %d", v)
-	}
-	if v := utilities.WithTimeLimit(fn2, timeout, time.Millisecond*50); v != 0 {
-		t.Errorf("expected 0, got %d", v)
 	}
 }
