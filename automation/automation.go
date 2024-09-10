@@ -85,12 +85,12 @@ func handleSSE(groundFloorEvents <-chan any, basementEvents <-chan any) {
 			if groundFloorEvent == nil {
 				return
 			}
-			encoder.Encode(groundFloorEvent)
+			_ = encoder.Encode(groundFloorEvent)
 		case basementEvent := <-basementEvents:
 			if basementEvent == nil {
 				return
 			}
-			encoder.Encode(basementEvent)
+			_ = encoder.Encode(basementEvent)
 		case <-quit:
 			return
 		}
@@ -144,8 +144,5 @@ func runPowerview(address string) {
 
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", " ")
-	if err = encoder.Encode(powerviewHub); err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(5)
-	}
+	_ = encoder.Encode(powerviewHub)
 }

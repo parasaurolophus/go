@@ -3,12 +3,26 @@
 package powerview
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 )
 
 type (
+	PowerviewScene struct {
+		Id     int    `json:"id"`
+		Name   string `json:"name"`
+		RoomId int    `json:"roomId"`
+	}
+
+	PowerviewRoom struct {
+		Id     int              `json:"id"`
+		Name   string           `json:"name"`
+		Scenes []PowerviewScene `json:"scenes,omitempty"`
+	}
+
 	PowerviewModel map[string]PowerviewRoom
 
 	PowerviewHub struct {
@@ -18,39 +32,43 @@ type (
 	}
 )
 
+type (
+	scenesData struct {
+		SceneData []PowerviewScene `json:"sceneData"`
+	}
+
+	roomsData struct {
+		RoomData []PowerviewRoom `json:"roomData"`
+	}
+)
+
 // Return a pointer to a PowerviewHub with the given label, at the specified
 // address.
 func New(label, address string) (hub *PowerviewHub, err error) {
+
 	powerviewHub := &PowerviewHub{
 		Label:   label,
 		Address: address,
 		Model:   PowerviewModel{},
 	}
-	var (
-		roomData  []map[string]any
-		sceneData []map[string]any
-	)
-	if roomData, err = powerviewHub.getRooms(); err != nil {
+
+	var scenes []PowerviewScene
+	if scenes, err = powerviewHub.getScenes(); err != nil {
 		return
 	}
-	if sceneData, err = powerviewHub.getScenes(); err != nil {
+
+	var rooms []PowerviewRoom
+	if rooms, err = powerviewHub.getRooms(scenes); err != nil {
 		return
 	}
-	var scenes = make([]PowerviewScene, len(sceneData))
-	for i, data := range sceneData {
-		if scenes[i], err = newScene(data); err != nil {
-			return
-		}
-	}
-	for _, r := range roomData {
-		var room PowerviewRoom
-		if room, err = newRoom(r, scenes); err != nil {
-			return
-		}
+
+	for _, room := range rooms {
+
 		if len(room.Scenes) > 0 {
 			powerviewHub.Model[room.Name] = room
 		}
 	}
+
 	hub = powerviewHub
 	return
 }
@@ -58,59 +76,131 @@ func New(label, address string) (hub *PowerviewHub, err error) {
 // Send a command to activate the scene with the given id.
 func (hub *PowerviewHub) ActivateScene(scene PowerviewScene) (response any, err error) {
 
-	response, err = hub.get(fmt.Sprintf("api/scenes?sceneId=%d", scene.Id))
-	return
-}
-
-func (hub *PowerviewHub) get(uri string) (response any, err error) {
-
-	url := fmt.Sprintf(`http://%s/%s`, hub.Address, uri)
-
-	resp, err := http.DefaultClient.Get(url)
-	if err != nil {
+	var resp *http.Response
+	if resp, err = get(hub.Address, fmt.Sprintf("api/scenes?sceneId=%d", scene.Id)); err != nil {
 		return
 	}
 
 	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		err = fmt.Errorf("%d: %s", resp.StatusCode, resp.Status)
-		return
-	}
 
 	decoder := json.NewDecoder(resp.Body)
 	err = decoder.Decode(&response)
 	return
 }
 
-func (hub *PowerviewHub) getData(uri, key string) (response []map[string]any, err error) {
+// Send a GET request to the API at the given address and URI, returning its
+// response.
+func get(address, uri string) (response *http.Response, err error) {
 
-	var r any
-	r, err = hub.get(uri)
+	url := fmt.Sprintf(`http://%s/%s`, address, uri)
+	if response, err = http.DefaultClient.Get(url); err != nil {
+		return
+	}
+
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		err = fmt.Errorf("%d: %s", response.StatusCode, response.Status)
+		_, _ = io.ReadAll(response.Body)
+		response.Body.Close()
+		response = nil
+	}
+
+	return
+}
+
+func getRoomsData(address string) (response roomsData, err error) {
+
+	var resp *http.Response
+	const uri = "api/rooms"
+	resp, err = get(address, uri)
 	if err != nil {
 		return
 	}
 
-	m := r.(map[string]any)
-	d := m[key]
-	a := d.([]any)
-	resp := make([]map[string]any, len(a))
+	defer resp.Body.Close()
 
-	for i, e := range a {
-
-		resp[i] = e.(map[string]any)
-	}
-
-	response = resp
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&response)
 	return
 }
 
-func (hub *PowerviewHub) getRooms() ([]map[string]any, error) {
+func getScenesData(address string) (response scenesData, err error) {
 
-	return hub.getData("api/rooms", "roomData")
+	var resp *http.Response
+	const uri = "api/scenes"
+	resp, err = get(address, uri)
+	if err != nil {
+		return
+	}
+
+	defer resp.Body.Close()
+
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&response)
+	return
 }
 
-func (hub *PowerviewHub) getScenes() ([]map[string]any, error) {
+func (hub *PowerviewHub) getRooms(scenes []PowerviewScene) (rooms []PowerviewRoom, err error) {
 
-	return hub.getData("api/scenes", "sceneData")
+	var data roomsData
+
+	if data, err = getRoomsData(hub.Address); err != nil {
+		return
+	}
+
+	r := []PowerviewRoom{}
+
+	for _, room := range data.RoomData {
+
+		var name []byte
+
+		if name, err = base64.StdEncoding.DecodeString(room.Name); err != nil {
+			return
+		}
+
+		s := []PowerviewScene{}
+		for _, scene := range scenes {
+
+			if scene.RoomId == room.Id {
+				s = append(s, scene)
+			}
+		}
+
+		r = append(r, PowerviewRoom{
+			Id:     room.Id,
+			Name:   string(name),
+			Scenes: s,
+		})
+	}
+
+	rooms = r
+	return
+}
+
+func (hub *PowerviewHub) getScenes() (scenes []PowerviewScene, err error) {
+
+	var data scenesData
+
+	if data, err = getScenesData(hub.Address); err != nil {
+		return
+	}
+
+	s := []PowerviewScene{}
+
+	for _, scene := range data.SceneData {
+
+		var name []byte
+
+		if name, err = base64.StdEncoding.DecodeString(scene.Name); err != nil {
+			return
+		}
+
+		s = append(s, PowerviewScene{
+			Id:     scene.Id,
+			Name:   string(name),
+			RoomId: scene.RoomId,
+		})
+	}
+
+	scenes = s
+	return
 }
