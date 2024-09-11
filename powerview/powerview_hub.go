@@ -11,20 +11,25 @@ import (
 )
 
 type (
+
+	// In-memory model for a powerview scene.
 	PowerviewScene struct {
 		Id     int    `json:"id"`
 		Name   string `json:"name"`
 		RoomId int    `json:"roomId"`
 	}
 
+	// In-memory model for a powerview room.
 	PowerviewRoom struct {
 		Id     int              `json:"id"`
 		Name   string           `json:"name"`
 		Scenes []PowerviewScene `json:"scenes,omitempty"`
 	}
 
+	// In-memory model for a powerview home.
 	PowerviewModel map[string]PowerviewRoom
 
+	// Interface to the API published by a powerview hub.
 	PowerviewHub struct {
 		Label   string         `json:"label"`
 		Address string         `json:"address"`
@@ -33,17 +38,22 @@ type (
 )
 
 type (
+
+	// Intermediate data model used to represent raw response from the
+	// api/scenes endpoint.
 	scenesData struct {
 		SceneData []PowerviewScene `json:"sceneData"`
 	}
 
+	// Intermediate data model used to represent raw response from the
+	// api/rooms endpoint.
 	roomsData struct {
 		RoomData []PowerviewRoom `json:"roomData"`
 	}
 )
 
-// Return a pointer to a PowerviewHub with the given label, at the specified
-// address.
+// Return a pointer to a PowerviewHub with the given label, at the specified IP
+// address or host name.
 func New(label, address string) (hub *PowerviewHub, err error) {
 
 	powerviewHub := &PowerviewHub{
@@ -88,57 +98,8 @@ func (hub *PowerviewHub) ActivateScene(scene PowerviewScene) (response any, err 
 	return
 }
 
-// Send a GET request to the API at the given address and URI, returning its
-// response.
-func get(address, uri string) (response *http.Response, err error) {
-
-	url := fmt.Sprintf(`http://%s/%s`, address, uri)
-	if response, err = http.DefaultClient.Get(url); err != nil {
-		return
-	}
-
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		err = fmt.Errorf("%d: %s", response.StatusCode, response.Status)
-		_, _ = io.ReadAll(response.Body)
-		response.Body.Close()
-		response = nil
-	}
-
-	return
-}
-
-func getRoomsData(address string) (response roomsData, err error) {
-
-	var resp *http.Response
-	const uri = "api/rooms"
-	resp, err = get(address, uri)
-	if err != nil {
-		return
-	}
-
-	defer resp.Body.Close()
-
-	decoder := json.NewDecoder(resp.Body)
-	err = decoder.Decode(&response)
-	return
-}
-
-func getScenesData(address string) (response scenesData, err error) {
-
-	var resp *http.Response
-	const uri = "api/scenes"
-	resp, err = get(address, uri)
-	if err != nil {
-		return
-	}
-
-	defer resp.Body.Close()
-
-	decoder := json.NewDecoder(resp.Body)
-	err = decoder.Decode(&response)
-	return
-}
-
+// Send a GET request to the api/rooms endpoint for the given hub, returning
+// its response as a slice of PowerviewRoom values.
 func (hub *PowerviewHub) getRooms(scenes []PowerviewScene) (rooms []PowerviewRoom, err error) {
 
 	var data roomsData
@@ -176,6 +137,8 @@ func (hub *PowerviewHub) getRooms(scenes []PowerviewScene) (rooms []PowerviewRoo
 	return
 }
 
+// Send a GET request to the api/scenes endpoint for the given hub, returning
+// its response as a slice of PowerviewScene values.
 func (hub *PowerviewHub) getScenes() (scenes []PowerviewScene, err error) {
 
 	var data scenesData
@@ -202,5 +165,60 @@ func (hub *PowerviewHub) getScenes() (scenes []PowerviewScene, err error) {
 	}
 
 	scenes = s
+	return
+}
+
+// Send a GET request to the API at the given address and URI, returning its
+// response.
+func get(address, uri string) (response *http.Response, err error) {
+
+	url := fmt.Sprintf(`http://%s/%s`, address, uri)
+	if response, err = http.DefaultClient.Get(url); err != nil {
+		return
+	}
+
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		err = fmt.Errorf("%d: %s", response.StatusCode, response.Status)
+		_, _ = io.ReadAll(response.Body)
+		response.Body.Close()
+		response = nil
+	}
+
+	return
+}
+
+// Send a GET request to the api/rooms endpoint at the specified IP address or
+// host name, parsing the response as a roomsData value.
+func getRoomsData(address string) (response roomsData, err error) {
+
+	var resp *http.Response
+	const uri = "api/rooms"
+	resp, err = get(address, uri)
+	if err != nil {
+		return
+	}
+
+	defer resp.Body.Close()
+
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&response)
+	return
+}
+
+// Send a GET request to the api/rooms endpoint at the specified IP address or
+// host name, parsing the response as a roomsData value.
+func getScenesData(address string) (response scenesData, err error) {
+
+	var resp *http.Response
+	const uri = "api/scenes"
+	resp, err = get(address, uri)
+	if err != nil {
+		return
+	}
+
+	defer resp.Body.Close()
+
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&response)
 	return
 }

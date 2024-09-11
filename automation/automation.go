@@ -145,4 +145,9 @@ func runPowerview(address string) {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", " ")
 	_ = encoder.Encode(powerviewHub)
+
+	// model := powerviewHub.Model
+	// room := model["Default Room"]
+	// scene := room.Scenes[0]
+	// powerviewHub.ActivateScene(scene)
 }
