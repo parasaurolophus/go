@@ -7,6 +7,10 @@ import (
 	"os"
 	"parasaurolophus/hue"
 	"parasaurolophus/powerview"
+	"strconv"
+	"time"
+
+	"github.com/sixdouglas/suncalc"
 )
 
 func main() {
@@ -30,11 +34,23 @@ func main() {
 		return
 	}
 
-	groundFloorAddr, groundFloorKey, basementAddr, basementKey, powerviewAddr, ok := getEnvVars()
+	groundFloorAddr, groundFloorKey, basementAddr, basementKey, powerviewAddr, latitude, longitude, ok := getEnvVars()
 	if !ok {
 		fmt.Fprintln(os.Stderr, "error reading environment variables")
 		os.Exit(1)
 	}
+
+	observer := suncalc.Observer{
+		Latitude:  latitude,
+		Longitude: longitude,
+		Height:    0,
+		Location:  time.Local,
+	}
+
+	times := suncalc.GetTimesWithObserver(time.Now(), observer)
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	_ = encoder.Encode(times)
 
 	if testPowerview {
 		runPowerview(powerviewAddr)
@@ -45,7 +61,13 @@ func main() {
 	}
 }
 
-func getEnvVars() (groundFloorAddr, groundFloorKey, basementAddr, basementKey, powerviewAddr string, ok bool) {
+func getEnvVars() (
+
+	groundFloorAddr, groundFloorKey, basementAddr, basementKey, powerviewAddr string,
+	latitude, longitude float64,
+	ok bool,
+
+) {
 
 	if groundFloorAddr, ok = os.LookupEnv("GROUND_FLOOR_HUE_ADDRESS"); !ok {
 		return
@@ -63,7 +85,29 @@ func getEnvVars() (groundFloorAddr, groundFloorKey, basementAddr, basementKey, p
 		return
 	}
 
-	powerviewAddr, ok = os.LookupEnv("POWERVIEW_ADDRESS")
+	if powerviewAddr, ok = os.LookupEnv("POWERVIEW_ADDRESS"); !ok {
+		return
+	}
+
+	var (
+		s   string
+		err error
+	)
+
+	if s, ok = os.LookupEnv("LATITUDE"); !ok {
+		return
+	} else if latitude, err = strconv.ParseFloat(s, 64); err != nil {
+		ok = false
+		return
+	}
+
+	if s, ok = os.LookupEnv("LONGITUDE"); !ok {
+		return
+	} else if longitude, err = strconv.ParseFloat(s, 64); err != nil {
+		ok = false
+		return
+	}
+
 	return
 }
 
