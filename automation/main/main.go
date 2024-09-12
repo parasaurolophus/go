@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"parasaurolophus/automation"
 	"parasaurolophus/automation/hue"
 	"parasaurolophus/automation/powerview"
+	"parasaurolophus/utilities"
 	"slices"
 	"strconv"
 	"time"
@@ -106,7 +108,19 @@ func getEnvVars() (
 	return
 }
 
-func handleSSE(groundFloorEvents <-chan any, basementEvents <-chan any) {
+func handleSSE(
+
+	groundFloorEvents <-chan any,
+	groundFloorTerminate chan<- any,
+	groundFloorAwait <-chan any,
+	basementEvents <-chan any,
+	basementTerminate chan<- any,
+	basementAwait <-chan any,
+
+) {
+
+	defer utilities.CloseAndWait(groundFloorTerminate, groundFloorAwait)
+	defer utilities.CloseAndWait(basementTerminate, basementAwait)
 
 	quit := make(chan any)
 	go func() {
@@ -140,40 +154,40 @@ func handleSSE(groundFloorEvents <-chan any, basementEvents <-chan any) {
 	}
 }
 
-func onDisconnect(*hue.HueBridge) {
-	panic(fmt.Errorf("hue hub disconnected"))
+func onDisconnect(address string) {
+
+	panic(fmt.Errorf("hue hub at %s disconnected", address))
 }
 
 func runHue(groundFloorAddr string, groundFloorKey string, basementAddr string, basementKey string) {
 
-	groundFloor, groundFloorEvents, err := hue.New("Ground Floor", groundFloorAddr, groundFloorKey, nil, onDisconnect)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "ground floor: %s\n", err.Error())
-		os.Exit(2)
-	}
-
-	basement, basementEvents, err := hue.New("Basement", basementAddr, basementKey, nil, onDisconnect)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "basement: %s\n", err.Error())
-		os.Exit(3)
-	}
+	sseErrors := make(chan error)
+	groundFloorEvents, groundFloorTerminate, groundFloorAwait := hue.SubscribeSSE(groundFloorAddr, groundFloorKey, nil, onDisconnect, sseErrors)
+	basementEvents, basementTerminate, basementAwait := hue.SubscribeSSE(basementAddr, basementKey, nil, onDisconnect, sseErrors)
 
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 
-	resources, err := groundFloor.Get("resource")
+	resources, err := hue.Send(groundFloorAddr, groundFloorKey, http.MethodGet, "resource", nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ground floor: %s\n", err.Error())
 	}
 	_ = encoder.Encode(resources)
 
-	resources, err = basement.Get("resource")
+	resources, err = hue.Send(basementAddr, basementKey, http.MethodGet, "resource", nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "basement: %s\n", err.Error())
 	}
 	_ = encoder.Encode(resources)
 
-	handleSSE(groundFloorEvents, basementEvents)
+	handleSSE(
+		groundFloorEvents,
+		groundFloorTerminate,
+		groundFloorAwait,
+		basementEvents,
+		basementTerminate,
+		basementAwait,
+	)
 }
 
 func runPowerview(address string) {
