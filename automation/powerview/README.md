@@ -1,58 +1,37 @@
 Copyright 2024 Kirk Rader
 
-# PowerView Hub Interface
+# PowerView Hub Wrapper
 
 ```
-package powerview // import "parasaurolophus/powerview"
+package powerview // import "parasaurolophus/automation/powerview"
+
+
+FUNCTIONS
+
+func ActivateScene(address string, sceneId int) (response any, err error)
+    Invoke the API exposed by the PowerView hub at the specified address.
 
 
 TYPES
 
-type PowerviewHub struct {
-	Label   string         `json:"label"`
-	Address string         `json:"address"`
-	Model   PowerviewModel `json:"model,omitempty"`
-}
-    Interface to the API published by a powerview hub.
-
-func New(label, address string) (hub *PowerviewHub, err error)
-    Return a pointer to a PowerviewHub with the given label, at the specified IP
-    address or host name.
-
-func (hub *PowerviewHub) ActivateScene(scene PowerviewScene) (response any, err error)
-    Send a command to activate the scene with the given id.
-
-type PowerviewModel map[string]PowerviewRoom
+type Model map[string]Room
     In-memory model for a powerview home.
 
-type PowerviewRoom struct {
-	Id     int              `json:"id"`
-	Name   string           `json:"name"`
-	Scenes []PowerviewScene `json:"scenes,omitempty"`
+func GetModel(address string) (model Model, err error)
+    Get the in-memory representation of the current configuration for all scenes
+    in all rooms from the PowerView hub at the specified address.
+
+type Room struct {
+        Id     int     `json:"id"`
+        Name   string  `json:"name"`
+        Scenes []Scene `json:"scenes,omitempty"`
 }
     In-memory model for a powerview room.
 
-type PowerviewScene struct {
-	Id     int    `json:"id"`
-	Name   string `json:"name"`
-	RoomId int    `json:"roomId"`
+type Scene struct {
+        Id     int    `json:"id"`
+        Name   string `json:"name"`
+        RoomId int    `json:"roomId"`
 }
     In-memory model for a powerview scene.
-
-```
-
-## Usage
-
-```go
-powerviewHub, err := powerview.New("Shades", address)
-
-if err != nil {
-    fmt.Fprintln(os.Stderr, err.Error())
-    os.Exit(4)
-}
-
-model := powerviewHub.Model
-room := model["Default Room"]
-scene := room.Scenes[0]
-powerviewHub.ActivateScene(scene)
 ```

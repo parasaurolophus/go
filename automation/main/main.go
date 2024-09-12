@@ -192,7 +192,7 @@ func runHue(groundFloorAddr string, groundFloorKey string, basementAddr string, 
 
 func runPowerview(address string) {
 
-	powerviewHub, err := powerview.New("Shades", address)
+	model, err := powerview.GetModel(address)
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
@@ -201,12 +201,11 @@ func runPowerview(address string) {
 
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", " ")
-	_ = encoder.Encode(powerviewHub)
+	_ = encoder.Encode(model)
 
-	// model := powerviewHub.Model
 	// room := model["Default Room"]
 	// scene := room.Scenes[0]
-	// powerviewHub.ActivateScene(scene)
+	// powerview.ActivateScene(address, scene.Id)
 }
 
 func runTriggers(latitude, longitude float64, bedtime int) {
