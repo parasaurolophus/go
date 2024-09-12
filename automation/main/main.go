@@ -5,8 +5,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"parasaurolophus/hue"
-	"parasaurolophus/powerview"
+	"parasaurolophus/automation"
+	"parasaurolophus/automation/hue"
+	"parasaurolophus/automation/powerview"
+	"slices"
 	"strconv"
 	"time"
 
@@ -16,12 +18,13 @@ import (
 func main() {
 
 	var (
-		help, testHue, testPowerview bool
+		help, testHue, testPowerview, testTriggers bool
 	)
 
 	flag.BoolVar(&help, "help", false, "display usage and exit")
 	flag.BoolVar(&testHue, "hue", false, "invoke Hue API")
 	flag.BoolVar(&testPowerview, "pv", false, "invoke PowerView API")
+	flag.BoolVar(&testTriggers, "triggers", false, "start sending automation trigger events")
 	flag.Parse()
 
 	if help {
@@ -29,7 +32,7 @@ func main() {
 		return
 	}
 
-	if !(testHue || testPowerview) {
+	if !(testHue || testPowerview || testTriggers) {
 		flag.Usage()
 		return
 	}
@@ -40,24 +43,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	observer := suncalc.Observer{
-		Latitude:  latitude,
-		Longitude: longitude,
-		Height:    0,
-		Location:  time.Local,
-	}
-
-	times := suncalc.GetTimesWithObserver(time.Now(), observer)
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	_ = encoder.Encode(times)
-
 	if testPowerview {
 		runPowerview(powerviewAddr)
 	}
 
 	if testHue {
 		runHue(groundFloorAddr, groundFloorKey, basementAddr, basementKey)
+	}
+
+	if testTriggers {
+		runTriggers(latitude, longitude, 10)
 	}
 }
 
@@ -124,17 +119,21 @@ func handleSSE(groundFloorEvents <-chan any, basementEvents <-chan any) {
 	encoder.SetIndent("", "  ")
 
 	for {
+
 		select {
+
 		case groundFloorEvent := <-groundFloorEvents:
 			if groundFloorEvent == nil {
 				return
 			}
 			_ = encoder.Encode(groundFloorEvent)
+
 		case basementEvent := <-basementEvents:
 			if basementEvent == nil {
 				return
 			}
 			_ = encoder.Encode(basementEvent)
+
 		case <-quit:
 			return
 		}
@@ -194,4 +193,60 @@ func runPowerview(address string) {
 	// room := model["Default Room"]
 	// scene := room.Scenes[0]
 	// powerviewHub.ActivateScene(scene)
+}
+
+func runTriggers(latitude, longitude float64, bedtime int) {
+
+	quit := make(chan any)
+	go func() {
+		buffer := []byte{0}
+		_, _ = os.Stdin.Read(buffer)
+		quit <- buffer[0]
+	}()
+
+	times := suncalc.GetTimes(time.Now(), latitude, longitude)
+	display := []suncalc.DayTimeName{
+		suncalc.Sunrise,
+		suncalc.SolarNoon,
+		suncalc.Sunset,
+	}
+
+	for k, v := range times {
+		if slices.Contains(display, k) {
+			fmt.Printf("%s: %s\n", v.Name, v.Value.Local())
+		}
+	}
+
+	for {
+
+		events, skipped, terminate, await, err := automation.SendTriggerEvents(latitude, longitude, bedtime)
+
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			os.Exit(5)
+		}
+
+		fmt.Println("Waiting for automation trigger events...")
+
+	NextDay:
+		for {
+
+			select {
+
+			case <-await:
+				break NextDay
+
+			case event := <-events:
+				fmt.Printf("triggered %s @ %s\n", event, time.Now())
+
+			case event := <-skipped:
+				fmt.Printf("skipped %s @ %s\n", event, time.Now())
+
+			case <-quit:
+				close(terminate)
+				<-await
+				return
+			}
+		}
+	}
 }
