@@ -21,17 +21,22 @@ func Send(
 )
     Invoke the V2 API exposed by the Hue Bridge at the given address.
 
-func SubscribeSSE(
+func SubscribeToSSE(
 
         address, key string,
         onConnect, onDisconnect func(string),
-        sseErrors chan<- error,
 
 ) (
 
         events <-chan any,
+        errors <-chan error,
         terminate chan<- any,
         await <-chan any,
 
 )
+    Start receiving SSE messages asynchronously from the Hue Bridge at the
+    specified address. SSE messages will be sent to the first returned channel.
+    This function launches a goroutine which will remain subscribed to the Hue
+    Bridge until the second returned channel is closed. The worker goroutine
+    will close the third returned channel before exiting.
 ```

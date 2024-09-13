@@ -2,6 +2,7 @@ all: test
 
 clean:
 	if [ -f automation ]; then rm automation; fi
+	if [ -f output.txt ]; then rm output.txt; fi
 
 cleanall: clean
 	go clean -r
@@ -9,5 +10,7 @@ cleanall: clean
 build:
 	go build -o automation
 
-test: cleanall build
+test:
+	$(MAKE) cleanall
+	$(MAKE) build
 	./automation

@@ -1,60 +1,142 @@
+// Copyright 2024 Kirk Rader
+
 package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"net/http"
 	"os"
-	"parasaurolophus/automation"
 	"parasaurolophus/automation/hue"
 	"parasaurolophus/automation/powerview"
+	"parasaurolophus/automation/trigger"
 	"parasaurolophus/utilities"
-	"slices"
 	"strconv"
 	"time"
-
-	"github.com/sixdouglas/suncalc"
 )
+
+var (
+	output *os.File
+)
+
+func init() {
+
+	var err error
+
+	if output, err = os.Create("output.txt"); err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
+}
 
 func main() {
 
-	var (
-		help, testHue, testPowerview, testTriggers bool
-	)
-
-	flag.BoolVar(&help, "help", false, "display usage and exit")
-	flag.BoolVar(&testHue, "hue", false, "invoke Hue API")
-	flag.BoolVar(&testPowerview, "pv", false, "invoke PowerView API")
-	flag.BoolVar(&testTriggers, "triggers", false, "start sending automation trigger events")
-	flag.Parse()
-
-	if help {
-		flag.Usage()
-		return
-	}
-
-	if !(testHue || testPowerview || testTriggers) {
-		flag.Usage()
-		return
-	}
+	///////////////////////////////////////////////////////////////////////////
+	// initialize
 
 	groundFloorAddr, groundFloorKey, basementAddr, basementKey, powerviewAddr, latitude, longitude, ok := getEnvVars()
 	if !ok {
 		fmt.Fprintln(os.Stderr, "error reading environment variables")
-		os.Exit(1)
+		os.Exit(2)
 	}
 
-	if testPowerview {
-		runPowerview(powerviewAddr)
+	quit := make(chan any)
+	go func() {
+		buffer := []byte{0}
+		_, _ = os.Stdin.Read(buffer)
+		quit <- buffer[0]
+	}()
+
+	encoder := json.NewEncoder(output)
+	encoder.SetIndent("", "  ")
+
+	///////////////////////////////////////////////////////////////////////////
+	// invoke powerview hub API
+
+	model, err := powerview.GetModel(powerviewAddr)
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(3)
 	}
 
-	if testHue {
-		runHue(groundFloorAddr, groundFloorKey, basementAddr, basementKey)
+	_ = encoder.Encode(model)
+
+	// room := model["Default Room"]
+	// scene := room.Scenes[0]
+	// powerview.ActivateScene(address, scene.Id)
+
+	///////////////////////////////////////////////////////////////////////////
+	// subscribe to SSE messages from two hue briges and invoke the synchronous
+	// API on each
+
+	groundFloorEvents, groundFloorErrors, groundFloorTerminate, groundFloorAwait, err :=
+		hue.SubscribeToSSE(
+			groundFloorAddr,
+			groundFloorKey,
+			onHueConnect,
+			onHueDisconnect,
+		)
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(4)
 	}
 
-	if testTriggers {
-		runTriggers(latitude, longitude, 10)
+	basementEvents, basementErrors, basementTerminate, basementAwait, err :=
+		hue.SubscribeToSSE(
+			basementAddr,
+			basementKey,
+			onHueConnect,
+			onHueDisconnect,
+		)
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(5)
+	}
+
+	resources, err := hue.Send(groundFloorAddr, groundFloorKey, http.MethodGet, "resource", nil)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ground floor: %s\n", err.Error())
+		os.Exit(6)
+	}
+	_ = encoder.Encode(resources)
+
+	resources, err = hue.Send(basementAddr, basementKey, http.MethodGet, "resource", nil)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "basement: %s\n", err.Error())
+		os.Exit(7)
+	}
+	_ = encoder.Encode(resources)
+
+	///////////////////////////////////////////////////////////////////////////
+	// handle the asynchronous events from all of the above, as well as
+	// automation trigger events based on the given geographic coordinates and
+	// bedtime hour
+
+	err = handleEvents(
+
+		latitude,
+		longitude,
+		10,
+
+		groundFloorEvents,
+		groundFloorErrors,
+		groundFloorTerminate,
+		groundFloorAwait,
+
+		basementEvents,
+		basementErrors,
+		basementTerminate,
+		basementAwait,
+
+		quit,
+	)
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(8)
 	}
 }
 
@@ -108,158 +190,95 @@ func getEnvVars() (
 	return
 }
 
-func handleSSE(
+func handleEvents(
+
+	latitude, longitude float64,
+	bedtime int,
 
 	groundFloorEvents <-chan any,
+	groundFloorErrors <-chan error,
 	groundFloorTerminate chan<- any,
 	groundFloorAwait <-chan any,
+
 	basementEvents <-chan any,
+	basementErrors <-chan error,
 	basementTerminate chan<- any,
 	basementAwait <-chan any,
+
+	quit <-chan any,
+
+) (
+
+	err error,
 
 ) {
 
 	defer utilities.CloseAndWait(groundFloorTerminate, groundFloorAwait)
 	defer utilities.CloseAndWait(basementTerminate, basementAwait)
 
-	quit := make(chan any)
-	go func() {
-		buffer := []byte{0}
-		_, _ = os.Stdin.Read(buffer)
-		quit <- buffer[0]
-	}()
-
-	encoder := json.NewEncoder(os.Stdout)
+	encoder := json.NewEncoder(output)
 	encoder.SetIndent("", "  ")
 
 	for {
 
-		select {
+		///////////////////////////////////////////////////////////////////////////
+		// send automation trigger events over the course of the current day
 
-		case groundFloorEvent := <-groundFloorEvents:
-			if groundFloorEvent == nil {
-				return
-			}
-			_ = encoder.Encode(groundFloorEvent)
+		var (
+			triggers, triggersSkipped <-chan trigger.Trigger
+			triggersTerminate         chan<- any
+			triggersAwait             <-chan any
+		)
 
-		case basementEvent := <-basementEvents:
-			if basementEvent == nil {
-				return
-			}
-			_ = encoder.Encode(basementEvent)
-
-		case <-quit:
+		if triggers, triggersSkipped, triggersTerminate, triggersAwait, err = trigger.SendTriggerEvents(latitude, longitude, bedtime); err != nil {
 			return
 		}
-	}
-}
-
-func onDisconnect(address string) {
-
-	panic(fmt.Errorf("hue hub at %s disconnected", address))
-}
-
-func runHue(groundFloorAddr string, groundFloorKey string, basementAddr string, basementKey string) {
-
-	sseErrors := make(chan error)
-	groundFloorEvents, groundFloorTerminate, groundFloorAwait := hue.SubscribeSSE(groundFloorAddr, groundFloorKey, nil, onDisconnect, sseErrors)
-	basementEvents, basementTerminate, basementAwait := hue.SubscribeSSE(basementAddr, basementKey, nil, onDisconnect, sseErrors)
-
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-
-	resources, err := hue.Send(groundFloorAddr, groundFloorKey, http.MethodGet, "resource", nil)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "ground floor: %s\n", err.Error())
-	}
-	_ = encoder.Encode(resources)
-
-	resources, err = hue.Send(basementAddr, basementKey, http.MethodGet, "resource", nil)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "basement: %s\n", err.Error())
-	}
-	_ = encoder.Encode(resources)
-
-	handleSSE(
-		groundFloorEvents,
-		groundFloorTerminate,
-		groundFloorAwait,
-		basementEvents,
-		basementTerminate,
-		basementAwait,
-	)
-}
-
-func runPowerview(address string) {
-
-	model, err := powerview.GetModel(address)
-
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(4)
-	}
-
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", " ")
-	_ = encoder.Encode(model)
-
-	// room := model["Default Room"]
-	// scene := room.Scenes[0]
-	// powerview.ActivateScene(address, scene.Id)
-}
-
-func runTriggers(latitude, longitude float64, bedtime int) {
-
-	quit := make(chan any)
-	go func() {
-		buffer := []byte{0}
-		_, _ = os.Stdin.Read(buffer)
-		quit <- buffer[0]
-	}()
-
-	times := suncalc.GetTimes(time.Now(), latitude, longitude)
-	display := []suncalc.DayTimeName{
-		suncalc.Sunrise,
-		suncalc.SolarNoon,
-		suncalc.Sunset,
-	}
-
-	for k, v := range times {
-		if slices.Contains(display, k) {
-			fmt.Printf("%s: %s\n", v.Name, v.Value.Local())
-		}
-	}
-
-	for {
-
-		events, skipped, terminate, await, err := automation.SendTriggerEvents(latitude, longitude, bedtime)
-
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err.Error())
-			os.Exit(5)
-		}
-
-		fmt.Println("Waiting for automation trigger events...")
 
 	NextDay:
 		for {
 
 			select {
 
-			case <-await:
+			case groundFloorEvent := <-groundFloorEvents:
+				_ = encoder.Encode(groundFloorEvent)
+
+			case e := <-groundFloorErrors:
+				err = e
+				return
+
+			case basementEvent := <-basementEvents:
+				_ = encoder.Encode(basementEvent)
+
+			case e := <-basementErrors:
+				err = e
+				return
+
+			case event := <-triggers:
+				output.WriteString(fmt.Sprintf("%s @ %s\n", event, time.Now().Format(time.DateTime)))
+
+			case event := <-triggersSkipped:
+				output.WriteString(fmt.Sprintf("skipped %s @ %s\n", event, time.Now()))
+
+			case <-triggersAwait:
 				break NextDay
 
-			case event := <-events:
-				fmt.Printf("triggered %s @ %s\n", event, time.Now())
-
-			case event := <-skipped:
-				fmt.Printf("skipped %s @ %s\n", event, time.Now())
-
 			case <-quit:
-				close(terminate)
-				<-await
+				utilities.CloseAndWait(triggersTerminate, triggersAwait)
 				return
 			}
 		}
 	}
+}
+
+func onHueConnect(address string) {
+
+	output.WriteString(fmt.Sprintf("hue hub at %s connected @ %s\n", address, time.Now().Format(time.DateTime)))
+}
+
+func onHueDisconnect(address string) {
+
+	err := fmt.Errorf("hue hub at %s disconnected @ %s", address, time.Now().Format(time.DateTime))
+	output.WriteString(err.Error())
+	output.WriteString("\n")
+	os.Exit(9)
 }
