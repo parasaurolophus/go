@@ -47,138 +47,113 @@ func SendTriggerEvents(
 	term := make(chan any)
 	terminate = term
 
-	go sendEvents(latitude, longitude, bedtime, ev, sk, term, aw)
-	return
-}
+	go func() {
 
-// Worker goroutine that sends Trigger events using timers based on the sun's
-// position over the course of the current day.
-func sendEvents(
+		defer close(aw)
 
-	latitude float64,
-	longitude float64,
-	bedtime int,
-	events chan<- Trigger,
-	skipped chan<- Trigger,
-	terminate <-chan any,
-	await chan<- any,
+		now := time.Now()
+		times := suncalc.GetTimes(now, latitude, longitude)
+		bedtimeTime := time.Date(now.Year(), now.Month(), now.Day(), bedtime, 0, 0, 0, time.Local)
 
-) {
-
-	defer close(await)
-
-	now := time.Now()
-	times := suncalc.GetTimes(now, latitude, longitude)
-
-	sunriseTimer := time.NewTimer(time.Until(times[suncalc.Sunrise].Value))
-	defer sunriseTimer.Stop()
-
-	noonTimer := time.NewTimer(time.Until(times[suncalc.SolarNoon].Value))
-	defer noonTimer.Stop()
-
-	sunsetTimer := time.NewTimer(time.Until(times[suncalc.Sunset].Value))
-	defer sunsetTimer.Stop()
-
-	eveningTimer := time.NewTimer(time.Until(times[suncalc.Night].Value))
-	defer eveningTimer.Stop()
-
-	bedtimeTime := time.Date(now.Year(), now.Month(), now.Day(), bedtime, 0, 0, 0, time.Local)
-
-	if !bedtimeTime.After(times[suncalc.Night].Value) {
-		bedtimeTime = times[suncalc.Night].Value.Add(30 * time.Minute)
-	}
-
-	bedtimeTimer := time.NewTimer(time.Until(bedtimeTime))
-	defer bedtimeTimer.Stop()
-
-	var nightTime time.Time
-
-	if now.Hour() < 1 {
-		nightTime = time.Date(now.Year(), now.Month(), now.Day(), 1, 1, 0, 0, time.Local)
-	} else {
-		tomorrow := now.Add(24 * time.Hour)
-		nightTime = time.Date(tomorrow.Year(), tomorrow.Month(), tomorrow.Day(), 1, 1, 0, 0, time.Local)
-	}
-
-	nightTimer := time.NewTimer(time.Until(nightTime))
-	defer nightTimer.Stop()
-
-	fmt.Printf("sunrise: %s\n", times[suncalc.Sunrise].Value.Local().Format(time.RFC850))
-	fmt.Printf("noon: %s\n", times[suncalc.SolarNoon].Value.Local().Format(time.RFC850))
-	fmt.Printf("sunset: %s\n", times[suncalc.Sunset].Value.Local().Format(time.RFC850))
-	fmt.Printf("evening: %s\n", times[suncalc.Night].Value.Local().Format(time.RFC850))
-	fmt.Printf("bedtime: %s\n", bedtimeTime.Format(time.RFC850))
-	fmt.Printf("night: %s\n", nightTime.Format(time.RFC850))
-
-	for {
-
-		select {
-
-		case <-sunriseTimer.C:
-			n := time.Now()
-			if n.Before(times[suncalc.Sunrise].Value.Add(time.Minute)) {
-				fmt.Printf("triggered %s @ %s\n", Sunrise, n.Format(time.RFC850))
-				events <- Sunrise
-			} else {
-				fmt.Printf("skipped %s @ %s\n", Sunrise, n.Format(time.RFC850))
-				skipped <- Sunrise
-			}
-
-		case <-noonTimer.C:
-			n := time.Now()
-			if n.Before(times[suncalc.SolarNoon].Value.Add(time.Minute)) {
-				fmt.Printf("triggered %s @ %s\n", Noon, n.Format(time.RFC850))
-				events <- Noon
-			} else {
-				fmt.Printf("skipped %s @ %s\n", Noon, n.Format(time.RFC850))
-				skipped <- Noon
-			}
-
-		case <-sunsetTimer.C:
-			n := time.Now()
-			if n.Before(times[suncalc.Sunset].Value.Add(time.Minute)) {
-				fmt.Printf("triggered %s @ %s\n", Sunset, n.Format(time.RFC850))
-				events <- Sunset
-			} else {
-				fmt.Printf("skipped %s @ %s\n", Sunset, n.Format(time.RFC850))
-				skipped <- Sunset
-			}
-
-		case <-bedtimeTimer.C:
-			n := time.Now()
-			if n.Before(bedtimeTime.Add(time.Minute)) {
-				fmt.Printf("triggered %s @ %s\n", Bedtime, n.Format(time.RFC850))
-				events <- Bedtime
-			} else {
-				fmt.Printf("skipped %s @ %s\n", Bedtime, n.Format(time.RFC850))
-				skipped <- Bedtime
-			}
-
-		case <-eveningTimer.C:
-			n := time.Now()
-			if n.Before(times[suncalc.Night].Value.Add(time.Minute)) {
-				fmt.Printf("triggered %s @ %s\n", Evening, n.Format(time.RFC850))
-				events <- Evening
-			} else {
-				fmt.Printf("skipped %s @ %s\n", Evening, n.Format(time.RFC850))
-				skipped <- Evening
-			}
-
-		case <-nightTimer.C:
-			n := time.Now()
-			if n.Before(nightTime.Add(time.Minute)) {
-				fmt.Printf("triggered %s @ %s\n", Night, n.Format(time.RFC850))
-				events <- Night
-			} else {
-				fmt.Printf("skipped %s @ %s\n", Night, n.Format(time.RFC850))
-				skipped <- Night
-			}
-			fmt.Printf("automation triggers worker thread exiting after final event of the day @ %s\n", n.Format(time.RFC850))
-			return
-
-		case <-terminate:
-			fmt.Printf("automation triggers worker thread terminated @ %s\n", time.Now().Format(time.RFC850))
-			return
+		if !bedtimeTime.After(times[suncalc.Night].Value) {
+			bedtimeTime = times[suncalc.Night].Value.Add(30 * time.Minute)
 		}
-	}
+
+		var nightTime time.Time
+
+		if now.Hour() < 1 {
+			nightTime = time.Date(now.Year(), now.Month(), now.Day(), 1, 1, 0, 0, time.Local)
+		} else {
+			tomorrow := now.Add(24 * time.Hour)
+			nightTime = time.Date(tomorrow.Year(), tomorrow.Month(), tomorrow.Day(), 1, 1, 0, 0, time.Local)
+		}
+
+		sunriseTimer := time.NewTimer(time.Until(times[suncalc.Sunrise].Value))
+		noonTimer := time.NewTimer(time.Until(times[suncalc.SolarNoon].Value))
+		sunsetTimer := time.NewTimer(time.Until(times[suncalc.Sunset].Value))
+		eveningTimer := time.NewTimer(time.Until(times[suncalc.Night].Value))
+		bedtimeTimer := time.NewTimer(time.Until(bedtimeTime))
+		nightTimer := time.NewTimer(time.Until(nightTime))
+
+		fmt.Printf("sunrise: %s\n", times[suncalc.Sunrise].Value.Local().Format(time.RFC850))
+		fmt.Printf("noon: %s\n", times[suncalc.SolarNoon].Value.Local().Format(time.RFC850))
+		fmt.Printf("sunset: %s\n", times[suncalc.Sunset].Value.Local().Format(time.RFC850))
+		fmt.Printf("evening: %s\n", times[suncalc.Night].Value.Local().Format(time.RFC850))
+		fmt.Printf("bedtime: %s\n", bedtimeTime.Format(time.RFC850))
+		fmt.Printf("night: %s\n", nightTime.Format(time.RFC850))
+
+		for {
+
+			select {
+
+			case <-sunriseTimer.C:
+				n := time.Now()
+				if n.Before(times[suncalc.Sunrise].Value.Add(time.Minute)) {
+					fmt.Printf("triggered %s @ %s\n", Sunrise, n.Format(time.RFC850))
+					ev <- Sunrise
+				} else {
+					fmt.Printf("skipped %s @ %s\n", Sunrise, n.Format(time.RFC850))
+					sk <- Sunrise
+				}
+
+			case <-noonTimer.C:
+				n := time.Now()
+				if n.Before(times[suncalc.SolarNoon].Value.Add(time.Minute)) {
+					fmt.Printf("triggered %s @ %s\n", Noon, n.Format(time.RFC850))
+					ev <- Noon
+				} else {
+					fmt.Printf("skipped %s @ %s\n", Noon, n.Format(time.RFC850))
+					sk <- Noon
+				}
+
+			case <-sunsetTimer.C:
+				n := time.Now()
+				if n.Before(times[suncalc.Sunset].Value.Add(time.Minute)) {
+					fmt.Printf("triggered %s @ %s\n", Sunset, n.Format(time.RFC850))
+					ev <- Sunset
+				} else {
+					fmt.Printf("skipped %s @ %s\n", Sunset, n.Format(time.RFC850))
+					sk <- Sunset
+				}
+
+			case <-bedtimeTimer.C:
+				n := time.Now()
+				if n.Before(bedtimeTime.Add(time.Minute)) {
+					fmt.Printf("triggered %s @ %s\n", Bedtime, n.Format(time.RFC850))
+					ev <- Bedtime
+				} else {
+					fmt.Printf("skipped %s @ %s\n", Bedtime, n.Format(time.RFC850))
+					sk <- Bedtime
+				}
+
+			case <-eveningTimer.C:
+				n := time.Now()
+				if n.Before(times[suncalc.Night].Value.Add(time.Minute)) {
+					fmt.Printf("triggered %s @ %s\n", Evening, n.Format(time.RFC850))
+					ev <- Evening
+				} else {
+					fmt.Printf("skipped %s @ %s\n", Evening, n.Format(time.RFC850))
+					sk <- Evening
+				}
+
+			case <-nightTimer.C:
+				n := time.Now()
+				if n.Before(nightTime.Add(time.Minute)) {
+					fmt.Printf("triggered %s @ %s\n", Night, n.Format(time.RFC850))
+					ev <- Night
+				} else {
+					fmt.Printf("skipped %s @ %s\n", Night, n.Format(time.RFC850))
+					sk <- Night
+				}
+				fmt.Printf("automation triggers worker thread exiting after final event of the day @ %s\n", n.Format(time.RFC850))
+				return
+
+			case <-term:
+				fmt.Printf("automation triggers worker thread terminated @ %s\n", time.Now().Format(time.RFC850))
+				return
+			}
+		}
+	}()
+
+	return
 }

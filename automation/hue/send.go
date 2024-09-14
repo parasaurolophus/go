@@ -19,7 +19,7 @@ func Send(
 
 ) (
 
-	response any,
+	response Response,
 	err error,
 
 ) {

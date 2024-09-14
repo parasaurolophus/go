@@ -38,8 +38,8 @@ By "idiomatic" Go code, I mean:
 
 - Use goroutines and channels for asynchronous operations
 
-- Rely on communication via channels rather than shared memory in goroutines to
-  the greatest degree possible
+- Rely on communication via channels rather than access to shared memory in
+  goroutines to the greatest degree possible
 
 This led inevitably to a functional programming paradigm rather than, for
 example, a collection of "wrapper" structs with methods (i.e. the closest Go

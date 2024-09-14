@@ -15,10 +15,11 @@ import (
 
 // Start receiving SSE messages asynchronously from the Hue Bridge at the
 // specified address. SSE messages will be sent to the first returned channel.
-// Errors will be sent to the second returned channel. This function launches a
-// goroutine which will remain subscribed to the Hue Bridge until the third
-// returned channel is closed. The worker goroutine will close the fourth
-// returned channel before exiting.
+// Errors will be sent to the second returned channel. This function launches
+// two goroutines, one of which will remain subscribed to the Hue Bridge until
+// the third returned channel is closed. That worker goroutine will close the
+// fourth returned channel before exiting. The other worker goroutine is
+// created implicitly by calling sse.Client.SubscribeChanRaw.
 func SubscribeToSSE(
 
 	address, key string,
@@ -26,7 +27,7 @@ func SubscribeToSSE(
 
 ) (
 
-	events <-chan map[string]any,
+	events <-chan Item,
 	errors <-chan error,
 	terminate chan<- any,
 	await <-chan any,
@@ -34,101 +35,71 @@ func SubscribeToSSE(
 
 ) {
 
-	ev := make(chan map[string]any)
-	events = ev
-
+	// make the channels used to communicate with callers of SubscribeToSSE
+	ev := make(chan Item)
 	er := make(chan error)
-	errors = er
-
 	term := make(chan any)
-	terminate = term
-
 	aw := make(chan any)
-	await = aw
 
-	sseEvents := make(chan *sse.Event)
-	go process(ev, term, aw, er, sseEvents)
-	err = subscribe(address, key, onConnect, onDisconnect, sseEvents)
+	// make the channel used to communicate with the worker goroutines launched
+	// as a side-effect of calling SubscribeSSE
+	rawEvents := make(chan *sse.Event)
 
-	if err != nil {
-		utilities.CloseAndWait(term, aw)
-	}
+	// launch a worker goroutine which consumes raw SSE messages from the hue
+	// bridge at the specified address and forwards them to the events and
+	// error channels, as appropriate
+	go func() {
 
-	return
-}
+		defer close(aw)
 
-// Worker goroutine that consumes raw SSE messages and forwards them to the
-// output events channel.
-func process(
+		for {
 
-	events chan<- map[string]any,
-	terminate <-chan any,
-	await chan<- any,
-	sseErrors chan<- error,
-	sseEvents <-chan *sse.Event,
+			select {
 
-) {
+			case <-term:
+				return
 
-	defer close(await)
-
-	for {
-
-		select {
-
-		case <-terminate:
-			return
-
-		case event := <-sseEvents:
-			dataReader := bytes.NewReader(event.Data)
-			eventStreamReader := sse.NewEventStreamReader(dataReader, 65536)
-			marshaledJSON, err := eventStreamReader.ReadEvent()
-			if err != nil {
-				sseErrors <- err
-				continue
+			case event := <-rawEvents:
+				dataReader := bytes.NewReader(event.Data)
+				eventStreamReader := sse.NewEventStreamReader(dataReader, 65536)
+				marshaledJSON, err := eventStreamReader.ReadEvent()
+				if err != nil {
+					er <- err
+					continue
+				}
+				var datum []map[string]any
+				err = json.Unmarshal(marshaledJSON, &datum)
+				if err != nil {
+					er <- err
+					continue
+				}
+				walkRawMessage(datum, ev, er)
 			}
-			var datum []map[string]any
-			err = json.Unmarshal(marshaledJSON, &datum)
-			if err != nil {
-				sseErrors <- err
-				continue
-			}
-			walkData(datum, events, sseErrors)
 		}
-	}
-}
+	}()
 
-// Worker go routine that subscribes to raw SSE messages from the specified Hue
-// Bridge.
-func subscribe(
-
-	address, key string,
-	onConnect, onDisconnect func(string),
-	sseEvents chan *sse.Event,
-
-) (
-
-	err error,
-
-) {
-
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-
-	url := fmt.Sprintf(`https://%s/eventstream/clip/v2`, address)
-
+	// create the sse.Client used to subscribe to the raw SSE messages from the
+	// bridge at the specified address
 	sseClient := sse.NewClient(
-		url,
+
+		fmt.Sprintf(`https://%s/eventstream/clip/v2`, address),
+
 		func(c *sse.Client) {
-			c.Connection.Transport = transport
+
+			c.Connection.Transport = &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			}
+
 			c.Headers = map[string]string{
 				"hue-application-key": key,
 			}
+
 			c.OnConnect(func(*sse.Client) {
 				if onConnect != nil {
 					onConnect(address)
 				}
 			})
+
 			c.OnDisconnect(func(*sse.Client) {
 				if onDisconnect != nil {
 					onDisconnect(address)
@@ -137,33 +108,45 @@ func subscribe(
 		},
 	)
 
-	err = sseClient.SubscribeChanRaw(sseEvents)
+	// launch a goroutine to listen for raw SSE messages, forwarding them to
+	// the rawEvents channel
+	if err = sseClient.SubscribeChanRaw(rawEvents); err != nil {
+		utilities.CloseAndWait(term, aw)
+		return
+	}
+
+	// set the returned unidirectional channels
+	events = ev
+	errors = er
+	terminate = term
+	await = aw
+
 	return
 }
 
-// A rather crufty mechanism for handling SSE data from Hue's very poorly
-// designed data model.
-func walkData(datum any, sseData chan<- map[string]any, sseErrors chan<- error) {
+// A rather crufty mechanism for handling raw SSE messages using Hue's very
+// poorly designed data model.
+func walkRawMessage(datum any, sseData chan<- Item, sseErrors chan<- error) {
 
 	switch v := datum.(type) {
 
 	case []any:
 		// process each element recursively when passed a slice of any
 		for _, d := range v {
-			walkData(d, sseData, sseErrors)
+			walkRawMessage(d, sseData, sseErrors)
 		}
 
 	case []map[string]any:
 		// process each element recursively when passed a collection of key /
 		// value pairs
 		for _, d := range v {
-			walkData(d, sseData, sseErrors)
+			walkRawMessage(d, sseData, sseErrors)
 		}
 
 	case map[string]any:
 		if d, ok := v["data"]; ok {
 			// process the value of "data" recursively, when present
-			walkData(d, sseData, sseErrors)
+			walkRawMessage(d, sseData, sseErrors)
 		} else {
 			// send leaf objects to the SSE data channel
 			sseData <- v

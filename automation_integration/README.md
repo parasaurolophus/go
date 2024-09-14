@@ -6,8 +6,9 @@ This console application sends the results of various interactions to `stdout`.
 It supports querying device configuration data from either or both of a
 hard-coded collection of Philips Hue "bridges" and a PowerView "hub." It does
 by using the software interfaces implemented by the
-[../hue/README.md](../hue/README.md) and
-[../powerview/README.md](../powerview/README.md) packages.
+[../automation/hue/README.md](../automation/hue/README.md) and
+[../automation/powerview/README.md](../automation/powerview/README.md)
+packages.
 
 ## Environment
 

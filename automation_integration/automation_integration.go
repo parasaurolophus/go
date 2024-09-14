@@ -197,12 +197,12 @@ func handleEvents(
 	latitude, longitude float64,
 	bedtime int,
 
-	groundFloorEvents <-chan map[string]any,
+	groundFloorEvents <-chan hue.Item,
 	groundFloorErrors <-chan error,
 	groundFloorTerminate chan<- any,
 	groundFloorAwait <-chan any,
 
-	basementEvents <-chan map[string]any,
+	basementEvents <-chan hue.Item,
 	basementErrors <-chan error,
 	basementTerminate chan<- any,
 	basementAwait <-chan any,
