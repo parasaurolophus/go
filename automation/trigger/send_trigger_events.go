@@ -79,10 +79,13 @@ func sendEvents(
 	sunsetTimer := time.NewTimer(time.Until(times[suncalc.Sunset].Value))
 	defer sunsetTimer.Stop()
 
+	eveningTimer := time.NewTimer(time.Until(times[suncalc.Night].Value))
+	defer eveningTimer.Stop()
+
 	bedtimeTime := time.Date(now.Year(), now.Month(), now.Day(), bedtime, 0, 0, 0, time.Local)
 
-	if !bedtimeTime.After(times[suncalc.Sunset].Value) {
-		bedtimeTime = times[suncalc.Sunset].Value.Add(30 * time.Minute)
+	if !bedtimeTime.After(times[suncalc.Night].Value) {
+		bedtimeTime = times[suncalc.Night].Value.Add(30 * time.Minute)
 	}
 
 	bedtimeTimer := time.NewTimer(time.Until(bedtimeTime))
@@ -100,11 +103,12 @@ func sendEvents(
 	nightTimer := time.NewTimer(time.Until(nightTime))
 	defer nightTimer.Stop()
 
-	fmt.Printf("sunrise: %s\n", times[suncalc.Sunrise].Value.Format(time.DateTime))
-	fmt.Printf("noon: %s\n", times[suncalc.SolarNoon].Value.Format(time.DateTime))
-	fmt.Printf("sunset: %s\n", times[suncalc.Sunset].Value.Format(time.DateTime))
-	fmt.Printf("bedtime: %s\n", bedtimeTime.Format(time.DateTime))
-	fmt.Printf("night: %s\n", nightTime.Format(time.DateTime))
+	fmt.Printf("sunrise: %s\n", times[suncalc.Sunrise].Value.Local().Format(time.RFC850))
+	fmt.Printf("noon: %s\n", times[suncalc.SolarNoon].Value.Local().Format(time.RFC850))
+	fmt.Printf("sunset: %s\n", times[suncalc.Sunset].Value.Local().Format(time.RFC850))
+	fmt.Printf("evening: %s\n", times[suncalc.Night].Value.Local().Format(time.RFC850))
+	fmt.Printf("bedtime: %s\n", bedtimeTime.Format(time.RFC850))
+	fmt.Printf("night: %s\n", nightTime.Format(time.RFC850))
 
 	for {
 
@@ -112,53 +116,68 @@ func sendEvents(
 
 		case <-sunriseTimer.C:
 			n := time.Now()
-			fmt.Printf("%s @ %s\n", Sunrise, n.Format(time.DateTime))
 			if n.Before(times[suncalc.Sunrise].Value.Add(time.Minute)) {
+				fmt.Printf("triggered %s @ %s\n", Sunrise, n.Format(time.RFC850))
 				events <- Sunrise
 			} else {
+				fmt.Printf("skipped %s @ %s\n", Sunrise, n.Format(time.RFC850))
 				skipped <- Sunrise
 			}
 
 		case <-noonTimer.C:
 			n := time.Now()
-			fmt.Printf("%s @ %s\n", Noon, n.Format(time.DateTime))
 			if n.Before(times[suncalc.SolarNoon].Value.Add(time.Minute)) {
+				fmt.Printf("triggered %s @ %s\n", Noon, n.Format(time.RFC850))
 				events <- Noon
 			} else {
+				fmt.Printf("skipped %s @ %s\n", Noon, n.Format(time.RFC850))
 				skipped <- Noon
 			}
 
 		case <-sunsetTimer.C:
 			n := time.Now()
-			fmt.Printf("%s @ %s\n", Sunset, n.Format(time.DateTime))
 			if n.Before(times[suncalc.Sunset].Value.Add(time.Minute)) {
+				fmt.Printf("triggered %s @ %s\n", Sunset, n.Format(time.RFC850))
 				events <- Sunset
 			} else {
+				fmt.Printf("skipped %s @ %s\n", Sunset, n.Format(time.RFC850))
 				skipped <- Sunset
 			}
 
 		case <-bedtimeTimer.C:
 			n := time.Now()
-			fmt.Printf("%s @ %s\n", Bedtime, n.Format(time.DateTime))
 			if n.Before(bedtimeTime.Add(time.Minute)) {
+				fmt.Printf("triggered %s @ %s\n", Bedtime, n.Format(time.RFC850))
 				events <- Bedtime
 			} else {
+				fmt.Printf("skipped %s @ %s\n", Bedtime, n.Format(time.RFC850))
 				skipped <- Bedtime
+			}
+
+		case <-eveningTimer.C:
+			n := time.Now()
+			if n.Before(times[suncalc.Night].Value.Add(time.Minute)) {
+				fmt.Printf("triggered %s @ %s\n", Evening, n.Format(time.RFC850))
+				events <- Evening
+			} else {
+				fmt.Printf("skipped %s @ %s\n", Evening, n.Format(time.RFC850))
+				skipped <- Evening
 			}
 
 		case <-nightTimer.C:
 			n := time.Now()
-			fmt.Printf("%s @ %s\n", Night, n.Format(time.DateTime))
 			if n.Before(nightTime.Add(time.Minute)) {
+				fmt.Printf("triggered %s @ %s\n", Night, n.Format(time.RFC850))
 				events <- Night
 			} else {
+				fmt.Printf("skipped %s @ %s\n", Night, n.Format(time.RFC850))
 				skipped <- Night
 			}
-			fmt.Printf("automation triggers worker thread exiting @ %s\n", n.Format(time.DateTime))
+			fmt.Printf("automation triggers worker thread exiting after final event of the day @ %s\n", n.Format(time.RFC850))
 			return
 
 		case <-terminate:
-			fmt.Printf("automation triggers worker thread terminated @ %s\n", time.Now().Format(time.DateTime))
+			fmt.Printf("automation triggers worker thread terminated @ %s\n", time.Now().Format(time.RFC850))
 			return
 		}
 	}

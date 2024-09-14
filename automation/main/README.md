@@ -25,20 +25,8 @@ The program assumes the following environment variables are set:
 
 ## Usage
 
-```
-Usage of ./automation:
-  -help
-        display usage and exit
-  -hue
-        invoke Hue API
-  -pv
-        invoke PowerView API
-  -triggers
-        start sending automation trigger events
-```
-
-At least one of `-hue`, `-pv` or `-triggers` is required. Invoking the program
-with no arguments is equivalent to passing it `-help`. If both `-pv` and either
-`-hue` or `-triggers` are supplied, the PowerView test is performed first, then
-the other test. Supplying both `-hue` and `-triggers` is allowed, but should be
-avoided due to contention for console I/O between ongoing goroutines.
+This application ignores any command-line arguments. When launched, it writes
+the output of various device API invocations and asynchronous events to a file
+named `output.txt` until it is terminted by pressing the return key. It also
+logs the operations of various goroutines to `stdout`, while writing error
+messages to `stderr`.

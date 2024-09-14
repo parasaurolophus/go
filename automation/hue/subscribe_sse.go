@@ -8,17 +8,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
-	"time"
+	"parasaurolophus/utilities"
 
 	"github.com/r3labs/sse/v2"
 )
 
 // Start receiving SSE messages asynchronously from the Hue Bridge at the
 // specified address. SSE messages will be sent to the first returned channel.
-// This function launches a goroutine which will remain subscribed to the Hue
-// Bridge until the second returned channel is closed. The worker goroutine
-// will close the third returned channel before exiting.
+// Errors will be sent to the second returned channel. This function launches a
+// goroutine which will remain subscribed to the Hue Bridge until the third
+// returned channel is closed. The worker goroutine will close the fourth
+// returned channel before exiting.
 func SubscribeToSSE(
 
 	address, key string,
@@ -26,7 +26,7 @@ func SubscribeToSSE(
 
 ) (
 
-	events <-chan any,
+	events <-chan map[string]any,
 	errors <-chan error,
 	terminate chan<- any,
 	await <-chan any,
@@ -34,7 +34,7 @@ func SubscribeToSSE(
 
 ) {
 
-	ev := make(chan any)
+	ev := make(chan map[string]any)
 	events = ev
 
 	er := make(chan error)
@@ -47,9 +47,13 @@ func SubscribeToSSE(
 	await = aw
 
 	sseEvents := make(chan *sse.Event)
-
 	go process(ev, term, aw, er, sseEvents)
 	err = subscribe(address, key, onConnect, onDisconnect, sseEvents)
+
+	if err != nil {
+		utilities.CloseAndWait(term, aw)
+	}
+
 	return
 }
 
@@ -57,7 +61,7 @@ func SubscribeToSSE(
 // output events channel.
 func process(
 
-	events chan<- any,
+	events chan<- map[string]any,
 	terminate <-chan any,
 	await chan<- any,
 	sseErrors chan<- error,
@@ -67,12 +71,6 @@ func process(
 
 	defer close(await)
 
-	defer func() {
-		fmt.Printf("hue SSE processor exiting @ %s\n", time.Now().Format(time.DateTime))
-	}()
-
-	fmt.Printf("hue SSE processor started @ %s\n", time.Now().Format(time.DateTime))
-
 	for {
 
 		select {
@@ -81,18 +79,17 @@ func process(
 			return
 
 		case event := <-sseEvents:
-			fmt.Printf("hue SSE message @ %s\n", time.Now().Format(time.DateTime))
 			dataReader := bytes.NewReader(event.Data)
 			eventStreamReader := sse.NewEventStreamReader(dataReader, 65536)
 			marshaledJSON, err := eventStreamReader.ReadEvent()
 			if err != nil {
-				fmt.Fprintln(os.Stderr, err.Error())
+				sseErrors <- err
 				continue
 			}
 			var datum []map[string]any
 			err = json.Unmarshal(marshaledJSON, &datum)
 			if err != nil {
-				fmt.Fprintln(os.Stderr, err.Error())
+				sseErrors <- err
 				continue
 			}
 			walkData(datum, events, sseErrors)
@@ -106,9 +103,6 @@ func subscribe(
 
 	address, key string,
 	onConnect, onDisconnect func(string),
-
-	// sseEvents cannot be given a directional constraint due to use with
-	// sse.Client.SubscribeChanRaw(chan *sse.Event)
 	sseEvents chan *sse.Event,
 
 ) (
@@ -116,8 +110,6 @@ func subscribe(
 	err error,
 
 ) {
-
-	fmt.Printf("hue SSE subscriber started @ %s\n", time.Now().Format(time.DateTime))
 
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -151,7 +143,7 @@ func subscribe(
 
 // A rather crufty mechanism for handling SSE data from Hue's very poorly
 // designed data model.
-func walkData(datum any, sseData chan<- any, sseErrors chan<- error) {
+func walkData(datum any, sseData chan<- map[string]any, sseErrors chan<- error) {
 
 	switch v := datum.(type) {
 

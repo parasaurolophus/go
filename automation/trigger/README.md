@@ -22,11 +22,15 @@ const (
         // lack the features which would make that straightforward to implement.
         Noon = Trigger("noon")
 
-        // E.g. turn on exterior lighting, open west-facing window coverings.
+        // E.g. turn on interior and exterior lighting, open west-facing window
+        // coverings.
         Sunset = Trigger("sunset")
 
-        // E.g. close all window coverings, set interior lights to night mode. This
-        // value is controlled by a parameter passed to the NewTimer function.
+        // E.g. close all window coverings
+        Evening = Trigger("evening")
+
+        // E.g. set interior lights to night mode. This value is controlled by a
+        // parameter passed to the NewTimer function.
         Bedtime = Trigger("bedtime")
 
         // E.g. turn off exterior lighting.

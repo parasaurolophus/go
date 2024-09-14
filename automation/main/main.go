@@ -35,12 +35,14 @@ func main() {
 	// initialize
 
 	groundFloorAddr, groundFloorKey, basementAddr, basementKey, powerviewAddr, latitude, longitude, ok := getEnvVars()
+
 	if !ok {
 		fmt.Fprintln(os.Stderr, "error reading environment variables")
 		os.Exit(2)
 	}
 
 	quit := make(chan any)
+
 	go func() {
 		buffer := []byte{0}
 		_, _ = os.Stdin.Read(buffer)
@@ -119,7 +121,7 @@ func main() {
 
 		latitude,
 		longitude,
-		10,
+		22,
 
 		groundFloorEvents,
 		groundFloorErrors,
@@ -195,12 +197,12 @@ func handleEvents(
 	latitude, longitude float64,
 	bedtime int,
 
-	groundFloorEvents <-chan any,
+	groundFloorEvents <-chan map[string]any,
 	groundFloorErrors <-chan error,
 	groundFloorTerminate chan<- any,
 	groundFloorAwait <-chan any,
 
-	basementEvents <-chan any,
+	basementEvents <-chan map[string]any,
 	basementErrors <-chan error,
 	basementTerminate chan<- any,
 	basementAwait <-chan any,
@@ -254,10 +256,10 @@ func handleEvents(
 				return
 
 			case event := <-triggers:
-				output.WriteString(fmt.Sprintf("%s @ %s\n", event, time.Now().Format(time.DateTime)))
+				fmt.Fprintf(output, "%s @ %s\n", event, time.Now().Format(time.RFC850))
 
 			case event := <-triggersSkipped:
-				output.WriteString(fmt.Sprintf("skipped %s @ %s\n", event, time.Now()))
+				fmt.Fprintf(output, "skipped %s @ %s\n", event, time.Now())
 
 			case <-triggersAwait:
 				break NextDay
@@ -272,13 +274,12 @@ func handleEvents(
 
 func onHueConnect(address string) {
 
-	output.WriteString(fmt.Sprintf("hue hub at %s connected @ %s\n", address, time.Now().Format(time.DateTime)))
+	fmt.Fprintf(output, "hue hub at %s connected @ %s\n", address, time.Now().Format(time.RFC850))
 }
 
 func onHueDisconnect(address string) {
 
-	err := fmt.Errorf("hue hub at %s disconnected @ %s", address, time.Now().Format(time.DateTime))
-	output.WriteString(err.Error())
-	output.WriteString("\n")
+	err := fmt.Errorf("hue hub at %s disconnected @ %s", address, time.Now().Format(time.RFC850))
+	fmt.Fprintln(output, err.Error())
 	os.Exit(9)
 }

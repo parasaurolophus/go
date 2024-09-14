@@ -28,15 +28,17 @@ func SubscribeToSSE(
 
 ) (
 
-        events <-chan any,
+        events <-chan map[string]any,
         errors <-chan error,
         terminate chan<- any,
         await <-chan any,
+        err error,
 
 )
     Start receiving SSE messages asynchronously from the Hue Bridge at the
     specified address. SSE messages will be sent to the first returned channel.
-    This function launches a goroutine which will remain subscribed to the Hue
-    Bridge until the second returned channel is closed. The worker goroutine
-    will close the third returned channel before exiting.
+    Errors will be sent to the second returned channel. This function launches
+    a goroutine which will remain subscribed to the Hue Bridge until the third
+    returned channel is closed. The worker goroutine will close the fourth
+    returned channel before exiting.
 ```
