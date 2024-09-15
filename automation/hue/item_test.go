@@ -178,6 +178,229 @@ func TestIdV1(t *testing.T) {
 	}
 }
 
+func TestMetadata(t *testing.T) {
+
+	// happy path
+	s := `{
+      "configuration_schema": {
+        "$ref": "motion_sensor_config.json#"
+      },
+      "description": "Motion sensor script",
+      "id": "bba79770-19f1-11ec-9621-0242ac130002",
+      "metadata": {
+        "category": "accessory",
+        "name": "Motion Sensor"
+      },
+      "state_schema": {
+        "$ref": "motion_sensor_state.json#"
+      },
+      "supported_features": [],
+      "trigger_schema": {},
+      "type": "behavior_script",
+      "version": "0.0.1"
+    }`
+
+	var item1 hue.Item
+
+	err := json.Unmarshal([]byte(s), &item1)
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	_, err = item1.Metadata()
+
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	// missing "metadata"
+	s = `{
+      "configuration_schema": {
+        "$ref": "motion_sensor_config.json#"
+      },
+      "description": "Motion sensor script",
+      "id": "bba79770-19f1-11ec-9621-0242ac130002",
+      "state_schema": {
+        "$ref": "motion_sensor_state.json#"
+      },
+      "supported_features": [],
+      "trigger_schema": {},
+      "type": "behavior_script",
+      "version": "0.0.1"
+    }`
+
+	var item2 hue.Item
+
+	err = json.Unmarshal([]byte(s), &item2)
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	_, err = item2.Metadata()
+	if err == nil {
+		t.Error("expected an error")
+	}
+
+	// invalid "metadata"
+	s = `{
+      "configuration_schema": {
+        "$ref": "motion_sensor_config.json#"
+      },
+      "description": "Motion sensor script",
+      "id": "bba79770-19f1-11ec-9621-0242ac130002",
+      "metadata": 42,
+      "state_schema": {
+        "$ref": "motion_sensor_state.json#"
+      },
+      "supported_features": [],
+      "trigger_schema": {},
+      "type": "behavior_script",
+      "version": "0.0.1"
+    }`
+
+	var item3 hue.Item
+
+	err = json.Unmarshal([]byte(s), &item3)
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	_, err = item3.Metadata()
+	if err == nil {
+		t.Error("expected an error")
+	}
+}
+
+func TestMetadataName(t *testing.T) {
+
+	// happy path
+	s := `{
+      "configuration_schema": {
+        "$ref": "motion_sensor_config.json#"
+      },
+      "description": "Motion sensor script",
+      "id": "bba79770-19f1-11ec-9621-0242ac130002",
+      "metadata": {
+        "category": "accessory",
+        "name": "Motion Sensor"
+      },
+      "state_schema": {
+        "$ref": "motion_sensor_state.json#"
+      },
+      "supported_features": [],
+      "trigger_schema": {},
+      "type": "behavior_script",
+      "version": "0.0.1"
+    }`
+
+	var item1 hue.Item
+
+	err := json.Unmarshal([]byte(s), &item1)
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	name, err := item1.MetadataName()
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	if name != "Motion Sensor" {
+		t.Errorf(`expected "Motion Sensor" but got "%s"`, name)
+	}
+
+	// missing name
+	s = `{
+      "configuration_schema": {
+        "$ref": "motion_sensor_config.json#"
+      },
+      "description": "Motion sensor script",
+      "id": "bba79770-19f1-11ec-9621-0242ac130002",
+      "metadata": {
+        "category": "accessory"
+      },
+      "state_schema": {
+        "$ref": "motion_sensor_state.json#"
+      },
+      "supported_features": [],
+      "trigger_schema": {},
+      "type": "behavior_script",
+      "version": "0.0.1"
+    }`
+
+	var item2 hue.Item
+
+	err = json.Unmarshal([]byte(s), &item2)
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	_, err = item2.MetadataName()
+	if err == nil {
+		t.Error("expected an error")
+	}
+
+	// invalid name
+	s = `{
+      "configuration_schema": {
+        "$ref": "motion_sensor_config.json#"
+      },
+      "description": "Motion sensor script",
+      "id": "bba79770-19f1-11ec-9621-0242ac130002",
+      "metadata": {
+        "category": "accessory",
+        "name": 42
+      },
+      "state_schema": {
+        "$ref": "motion_sensor_state.json#"
+      },
+      "supported_features": [],
+      "trigger_schema": {},
+      "type": "behavior_script",
+      "version": "0.0.1"
+    }`
+
+	var item3 hue.Item
+
+	err = json.Unmarshal([]byte(s), &item3)
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	_, err = item3.MetadataName()
+	if err == nil {
+		t.Error("expected an error")
+	}
+
+	// missing metadata
+	s = `{
+      "configuration_schema": {
+        "$ref": "motion_sensor_config.json#"
+      },
+      "description": "Motion sensor script",
+      "id": "bba79770-19f1-11ec-9621-0242ac130002",
+      "state_schema": {
+        "$ref": "motion_sensor_state.json#"
+      },
+      "supported_features": [],
+      "trigger_schema": {},
+      "type": "behavior_script",
+      "version": "0.0.1"
+    }`
+
+	var item4 hue.Item
+
+	err = json.Unmarshal([]byte(s), &item4)
+	if err != nil {
+		t.Error(err.Error())
+	}
+
+	_, err = item4.MetadataName()
+	if err == nil {
+		t.Error("expected an error")
+	}
+}
+
 func TestOwner(t *testing.T) {
 
 	// happy path
@@ -422,7 +645,7 @@ func TestOwnerRtype(t *testing.T) {
 		t.Error(err.Error())
 	}
 
-	rtype, err := item1.OwnerType()
+	rtype, err := item1.OwnerRtype()
 	if err != nil {
 		t.Error(err.Error())
 	}
@@ -456,7 +679,7 @@ func TestOwnerRtype(t *testing.T) {
 		t.Error(err.Error())
 	}
 
-	_, err = item2.OwnerType()
+	_, err = item2.OwnerRtype()
 	if err == nil {
 		t.Error("expected an error")
 	}
@@ -487,7 +710,7 @@ func TestOwnerRtype(t *testing.T) {
 		t.Error(err.Error())
 	}
 
-	_, err = item3.OwnerType()
+	_, err = item3.OwnerRtype()
 	if err == nil {
 		t.Error("expected an error")
 	}
@@ -514,7 +737,7 @@ func TestOwnerRtype(t *testing.T) {
 		t.Error(err.Error())
 	}
 
-	_, err = item4.OwnerType()
+	_, err = item4.OwnerRtype()
 	if err == nil {
 		t.Error("expected an error")
 	}

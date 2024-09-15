@@ -18,9 +18,16 @@ const (
 	IdV1 = "id_v1"
 	Type = "type"
 
-	// An "owner" is present in most, but not quite all, types of Items. It is
-	// used for cross-referencing items in the massive and bizarrely designed
-	// data structure returned by the /resource endpoint.
+	// A "metadata" field in some types of Items. When present, it contains a
+	// "name" field.
+	Metadata = "metadata"
+
+	// Metadata's "name" field.
+	Name = "name"
+
+	// An "owner" field is present in some types of Items. It is used for
+	// cross-referencing items in the massive and bizarrely designed data
+	// structure returned by the /resource endpoint.
 	Owner = "owner"
 
 	// Keys for the map that is the value of "owner" when present.
@@ -62,6 +69,42 @@ func (item Item) IdV1() (idV1 string, err error) {
 	return
 }
 
+// Getter for item["metadata"]
+func (item Item) Metadata() (metdata map[string]any, err error) {
+
+	var (
+		m  any
+		ok bool
+	)
+
+	if m, ok = item[Metadata]; !ok {
+		err = fmt.Errorf("missing metadata")
+	} else if metdata, ok = m.(map[string]any); !ok {
+		err = fmt.Errorf("metadata, of type %T, is not a map", m)
+	}
+
+	return
+}
+
+func (item Item) MetadataName() (name string, err error) {
+
+	var (
+		metadata map[string]any
+		n        any
+		ok       bool
+	)
+
+	if metadata, err = item.Metadata(); err == nil {
+		if n, ok = metadata[Name]; !ok {
+			err = fmt.Errorf("missing name")
+		} else if name, ok = n.(string); !ok {
+			err = fmt.Errorf("name, of type %T, is not a string", n)
+		}
+	}
+
+	return
+}
+
 // Getter for item["owner"].
 func (item Item) Owner() (owner map[string]any, err error) {
 
@@ -80,7 +123,7 @@ func (item Item) Owner() (owner map[string]any, err error) {
 }
 
 // Getter for item["owner"]["rid"].
-func (msg Item) OwnerRid() (rid string, err error) {
+func (item Item) OwnerRid() (rid string, err error) {
 
 	var (
 		owner map[string]any
@@ -88,7 +131,7 @@ func (msg Item) OwnerRid() (rid string, err error) {
 		ok    bool
 	)
 
-	if owner, err = msg.Owner(); err == nil {
+	if owner, err = item.Owner(); err == nil {
 		if i, ok = owner[Rid]; !ok {
 			err = fmt.Errorf("missing rid")
 		} else if rid, ok = i.(string); !ok {
@@ -100,7 +143,7 @@ func (msg Item) OwnerRid() (rid string, err error) {
 }
 
 // Getter for item["owner"]["rtype"].
-func (msg Item) OwnerType() (rtype string, err error) {
+func (item Item) OwnerRtype() (rtype string, err error) {
 
 	var (
 		owner map[string]any
@@ -108,7 +151,7 @@ func (msg Item) OwnerType() (rtype string, err error) {
 		ok    bool
 	)
 
-	if owner, err = msg.Owner(); err == nil {
+	if owner, err = item.Owner(); err == nil {
 		if t, ok = owner[Rtype]; !ok {
 			err = fmt.Errorf("missing rtype")
 		} else if rtype, ok = t.(string); !ok {
