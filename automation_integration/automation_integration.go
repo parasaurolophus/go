@@ -4,6 +4,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -33,6 +34,13 @@ func main() {
 
 	///////////////////////////////////////////////////////////////////////////
 	// initialize
+
+	help, bedtime := parseArgs()
+
+	if help {
+		flag.Usage()
+		return
+	}
 
 	groundFloorAddr, groundFloorKey, basementAddr, basementKey, powerviewAddr, latitude, longitude, ok := getEnvVars()
 
@@ -69,77 +77,91 @@ func main() {
 	// powerview.ActivateScene(address, scene.Id)
 
 	///////////////////////////////////////////////////////////////////////////
-	// subscribe to SSE messages from two hue briges and invoke the synchronous
-	// API on each
+	// start receiving automation trigger events over the course of each day
 
-	groundFloorEvents, groundFloorErrors, groundFloorTerminate, groundFloorAwait, err :=
-		hue.SubscribeToSSE(
-			groundFloorAddr,
-			groundFloorKey,
-			onHueConnect,
-			onHueDisconnect,
-		)
+	triggers, terminate, triggersAwait, err := trigger.StartTriggersTimer(latitude, longitude, bedtime)
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(4)
 	}
 
-	basementEvents, basementErrors, basementTerminate, basementAwait, err :=
-		hue.SubscribeToSSE(
-			basementAddr,
-			basementKey,
-			onHueConnect,
-			onHueDisconnect,
-		)
+	defer utilities.CloseAndWait(terminate, triggersAwait)
+
+	///////////////////////////////////////////////////////////////////////////
+	// subscribe to SSE messages from two hue briges and invoke the synchronous
+	// API on each
+
+	groundFloorItems, groundFloorErrors, groundFloorTerminate, groundFloorAwait, err := hue.ReceiveSSE(
+		groundFloorAddr,
+		groundFloorKey,
+		onHueConnect,
+		onHueDisconnect,
+	)
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(5)
 	}
 
-	resources, err := hue.Send(groundFloorAddr, groundFloorKey, http.MethodGet, "resource", nil)
+	defer utilities.CloseAndWait(groundFloorTerminate, groundFloorAwait)
+
+	basementItems, basementErrors, basementTerminate, basementAwait, err := hue.ReceiveSSE(
+		basementAddr,
+		basementKey,
+		onHueConnect,
+		onHueDisconnect,
+	)
+
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ground floor: %s\n", err.Error())
+		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(6)
 	}
-	_ = encoder.Encode(resources)
 
-	resources, err = hue.Send(basementAddr, basementKey, http.MethodGet, "resource", nil)
+	defer utilities.CloseAndWait(basementTerminate, basementAwait)
+
+	resources, err := hue.SendHTTP(groundFloorAddr, groundFloorKey, http.MethodGet, "resource", nil)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "basement: %s\n", err.Error())
+		fmt.Fprintf(os.Stderr, "ground floor: %s\n", err.Error())
 		os.Exit(7)
 	}
 	_ = encoder.Encode(resources)
 
+	resources, err = hue.SendHTTP(basementAddr, basementKey, http.MethodGet, "resource", nil)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "basement: %s\n", err.Error())
+		os.Exit(8)
+	}
+	_ = encoder.Encode(resources)
+
 	///////////////////////////////////////////////////////////////////////////
-	// handle the asynchronous events from all of the above, as well as
-	// automation trigger events based on the given geographic coordinates and
-	// bedtime hour
+	// handle the asynchronous events from all of the above
 
 	err = handleEvents(
 
-		latitude,
-		longitude,
-		22,
-
-		groundFloorEvents,
+		triggers,
+		triggersAwait,
+		groundFloorItems,
 		groundFloorErrors,
-		groundFloorTerminate,
 		groundFloorAwait,
-
-		basementEvents,
+		basementItems,
 		basementErrors,
-		basementTerminate,
 		basementAwait,
-
 		quit,
 	)
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(8)
+		os.Exit(9)
 	}
+}
+
+func parseArgs() (help bool, bedtime int) {
+
+	flag.BoolVar(&help, "help", false, "display usage and exit")
+	flag.IntVar(&bedtime, "bedtime", 22, "desired bedtime (0-23)")
+	flag.Parse()
+	return
 }
 
 func getEnvVars() (
@@ -194,19 +216,14 @@ func getEnvVars() (
 
 func handleEvents(
 
-	latitude, longitude float64,
-	bedtime int,
-
-	groundFloorEvents <-chan hue.Item,
+	triggers <-chan trigger.Trigger,
+	triggersAwait <-chan any,
+	groundFloorItems <-chan hue.Item,
 	groundFloorErrors <-chan error,
-	groundFloorTerminate chan<- any,
 	groundFloorAwait <-chan any,
-
-	basementEvents <-chan hue.Item,
+	basementItems <-chan hue.Item,
 	basementErrors <-chan error,
-	basementTerminate chan<- any,
 	basementAwait <-chan any,
-
 	quit <-chan any,
 
 ) (
@@ -215,59 +232,41 @@ func handleEvents(
 
 ) {
 
-	defer utilities.CloseAndWait(groundFloorTerminate, groundFloorAwait)
-	defer utilities.CloseAndWait(basementTerminate, basementAwait)
-
 	encoder := json.NewEncoder(output)
 	encoder.SetIndent("", "  ")
 
 	for {
 
-		///////////////////////////////////////////////////////////////////////////
-		// send automation trigger events over the course of the current day
+		select {
 
-		var (
-			triggers, triggersSkipped <-chan trigger.Trigger
-			triggersTerminate         chan<- any
-			triggersAwait             <-chan any
-		)
+		case groundFloorEvent := <-groundFloorItems:
+			_ = encoder.Encode(groundFloorEvent)
 
-		if triggers, triggersSkipped, triggersTerminate, triggersAwait, err = trigger.SendTriggerEvents(latitude, longitude, bedtime); err != nil {
+		case e := <-groundFloorErrors:
+			err = e
 			return
-		}
 
-	NextDay:
-		for {
+		case <-groundFloorAwait:
+			return
 
-			select {
+		case basementEvent := <-basementItems:
+			_ = encoder.Encode(basementEvent)
 
-			case groundFloorEvent := <-groundFloorEvents:
-				_ = encoder.Encode(groundFloorEvent)
+		case e := <-basementErrors:
+			err = e
+			return
 
-			case e := <-groundFloorErrors:
-				err = e
-				return
+		case <-basementAwait:
+			return
 
-			case basementEvent := <-basementEvents:
-				_ = encoder.Encode(basementEvent)
+		case event := <-triggers:
+			fmt.Fprintf(output, "triggered %s @ %s\n", event, time.Now().Format(time.RFC850))
 
-			case e := <-basementErrors:
-				err = e
-				return
+		case <-triggersAwait:
+			return
 
-			case event := <-triggers:
-				fmt.Fprintf(output, "%s @ %s\n", event, time.Now().Format(time.RFC850))
-
-			case event := <-triggersSkipped:
-				fmt.Fprintf(output, "skipped %s @ %s\n", event, time.Now())
-
-			case <-triggersAwait:
-				break NextDay
-
-			case <-quit:
-				utilities.CloseAndWait(triggersTerminate, triggersAwait)
-				return
-			}
+		case <-quit:
+			return
 		}
 	}
 }

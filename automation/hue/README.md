@@ -6,39 +6,16 @@ Copyright 2024 Kirk Rader
 package hue // import "parasaurolophus/automation/hue"
 
 
-CONSTANTS
-
-const (
-
-        // Keys common to all Items.
-        Id   = "id"
-        IdV1 = "id_v1"
-        Type = "type"
-
-        // An "owner" is present in most, but not quite all, types of Items. It is
-        // used for cross-referencing items in the massive and bizarrely designed
-        // data structure returned by the /resource endpoint.
-        Owner = "owner"
-
-        // Keys for the map that is the value of "owner" when present.
-        Rid   = "rid"
-        Rtype = "rtype"
-)
-    A few predefined keys for Item maps. There are countless other keys present
-    in Hue Bridge payloads used for device-specific types of items and for the
-    maps they contain.
-
-
 FUNCTIONS
 
-func SubscribeToSSE(
+func ReceiveSSE(
 
         address, key string,
         onConnect, onDisconnect func(string),
 
 ) (
 
-        events <-chan Item,
+        items <-chan Item,
         errors <-chan error,
         terminate chan<- any,
         await <-chan any,
@@ -46,37 +23,42 @@ func SubscribeToSSE(
 
 )
     Start receiving SSE messages asynchronously from the Hue Bridge at the
-    specified address. SSE messages will be sent to the first returned channel.
-    Errors will be sent to the second returned channel. This function launches
-    two goroutines, one of which will remain subscribed to the Hue Bridge until
-    the third returned channel is closed. That worker goroutine will close
-    the fourth returned channel before exiting. The other worker goroutine is
-    created implicitly by calling sse.Client.SubscribeChanRaw.
+    specified address. This function launches two goroutines as a side-effect.
+    One is created implicitly by a call to sse.Client.SubscribeChanRaw.
+    The other is created explicitly and can be monitored and controlled by the
+    returned await and terminate channels.
 
 
 TYPES
+
+type Group struct {
+        Name           string           `json:"name"`
+        Id             string           `json:"id"`
+        Type           string           `json:"type"`
+        On             bool             `json:"on"`
+        GroupedLightId string           `json:"grouped_light_id"`
+        Scenes         map[string]Scene `json:"scenes,omitempty"`
+}
+    Fields of interest from /resource/bridge_home, /resource/room/{id} or
+    /resource/zone/{id} endpoints' responses, plus relevant fields from related
+    scene and grouped_light resources for the given group.
+
+func (group Group) GetSceneById(id string) (scene Scene, ok bool)
 
 type Item map[string]any
     Alias for map[string]any used as the basic data model for the Hue Bridge API
     V2.
 
-func (item Item) Id() (id string, err error)
-    Getter for item["id"].
+type Model map[string]Group
+    Fields of interest from /resource endpoint's response, represented in a way
+    that makes them easy and efficient to use in a home automation application
+    (unlike Hue's bloated and bizarre data model),
 
-func (item Item) IdV1() (idV1 string, err error)
-    Getter for item["id_v1"].
+func NewModel(resources []Item) (model Model, err error)
 
-func (item Item) Owner() (owner map[string]any, err error)
-    Getter for item["owner"].
+func (model Model) GetGroupById(id string) (group Group, ok bool)
 
-func (msg Item) OwnerRid() (rid string, err error)
-    Getter for item["owner"]["rid"].
-
-func (msg Item) OwnerType() (rtype string, err error)
-    Getter for item["owner"]["rtype"].
-
-func (item Item) Type() (typ string, err error)
-    Getter for item["type"].
+func (model Model) GetScene(groupName string, sceneName string) (scene Scene, ok bool)
 
 type Response struct {
         Data   []Item `json:"data"`
@@ -84,7 +66,7 @@ type Response struct {
 }
     HTTP response payload structure
 
-func Send(
+func SendHTTP(
 
         address, key, method, uri string,
         payload any,
@@ -96,4 +78,10 @@ func Send(
 
 )
     Invoke the V2 API exposed by the Hue Bridge at the given address.
+
+type Scene struct {
+        Name string `json:"name"`
+        Id   string `json:"id"`
+}
+    Fields of interest from the /resource/scene/{id} endpoint's response.
 ```

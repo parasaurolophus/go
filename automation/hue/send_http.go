@@ -12,7 +12,7 @@ import (
 )
 
 // Invoke the V2 API exposed by the Hue Bridge at the given address.
-func Send(
+func SendHTTP(
 
 	address, key, method, uri string,
 	payload any,

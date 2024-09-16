@@ -42,8 +42,8 @@ func GetAttribute[Value any](m map[string]any, key string) (value Value, err err
 
 func GetJSONPath[Value any](
 
-        path []string,
         m map[string]any,
+        path ...string,
 
 ) (
 
@@ -55,22 +55,6 @@ func GetJSONPath[Value any](
     {"foo"} is equivalent to m["foo"] while {"foo", ""bar"} is equivalent to
     m["foo"]["bar"]. For paths with more than one entry, each intermediate
     container is assumed to be a map[string]any.
-
-func GetJSONPathString[Value any](
-
-        path string,
-        m map[string]any,
-
-) (
-
-        value Value,
-        err error,
-
-)
-    Return the value specified by the given path in the given map. Paths are "/"
-    delimited sequences of keys. For example, "foo" is equivalent to m["foo"]
-    while "foo/bar" is equivalent to m["foo"]["bar"]. For composite keys,
-    each intermediate container is assumed to be a map[string]any.
 
 func GetNumericAttribute[Value Number](m map[string]any, key string) (value Value, err error)
     Convert the value of the specified key in the given map to the specified

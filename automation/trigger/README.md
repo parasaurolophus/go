@@ -39,26 +39,22 @@ const (
 
 FUNCTIONS
 
-func SendTriggerEvents(
+func StartTriggersTimer(
 
         latitude, longitude float64,
         bedtime int,
 
 ) (
 
-        events <-chan Trigger,
-        skipped <-chan Trigger,
+        triggers <-chan Trigger,
         terminate chan<- any,
         await <-chan any,
         err error,
 
 )
     Launch a worker goroutine to send Trigger events at the appropriate times
-    on the current day. Triggers will be sent to the returned events channel
-    The worker goroutine will terminate after sending the "night" event or upon
-    closure of the returned terminate channel. It will close the returned await
-    channel before exiting. It will skip sending events for any times-of-day
-    that are already more than one minute out of date when it is launched.
+    each day. It will skip events for any times-of-day that are already out of
+    date when it is launched.
 
 
 TYPES

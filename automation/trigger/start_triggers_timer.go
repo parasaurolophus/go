@@ -9,21 +9,17 @@ import (
 	"github.com/sixdouglas/suncalc"
 )
 
-// Launch a worker goroutine to send Trigger events at the appropriate times on
-// the current day. Triggers will be sent to the returned events channel  The
-// worker goroutine will terminate after sending the "night" event or upon
-// closure of the returned terminate channel. It will close the returned await
-// channel before exiting. It will skip sending events for any times-of-day
-// that are already more than one minute out of date when it is launched.
-func SendTriggerEvents(
+// Launch a worker goroutine to send Trigger events at the appropriate times
+// each day. It will skip events for any times-of-day that are already out of
+// date when it is launched.
+func StartTriggersTimer(
 
 	latitude, longitude float64,
 	bedtime int,
 
 ) (
 
-	events <-chan Trigger,
-	skipped <-chan Trigger,
+	triggers <-chan Trigger,
 	terminate chan<- any,
 	await <-chan any,
 	err error,
@@ -35,24 +31,40 @@ func SendTriggerEvents(
 		return
 	}
 
-	ev := make(chan Trigger)
-	events = ev
-
-	sk := make(chan Trigger)
-	skipped = sk
-
+	// make the channels used to send and receive messages and signals
+	trig := make(chan Trigger)
+	term := make(chan any)
 	aw := make(chan any)
+
+	// set the unidirectional channels exposed to users of triggersTimer
+	triggers = trig
+	terminate = term
 	await = aw
 
-	term := make(chan any)
-	terminate = term
+	// start the worker goroutine
+	go worker(latitude, longitude, bedtime, trig, term, aw)
 
-	go func() {
+	return
+}
 
-		defer close(aw)
+func worker(
+
+	latitude, longitude float64,
+	bedtime int,
+	triggers chan Trigger,
+	terminate chan any,
+	await chan any,
+
+) {
+
+	defer close(await)
+
+	for {
 
 		now := time.Now()
-		times := suncalc.GetTimes(now, latitude, longitude)
+		base := time.Date(now.Year(), now.Month(), now.Day(), 1, 1, 0, 0, time.Local)
+		times := suncalc.GetTimes(base, latitude, longitude)
+
 		bedtimeTime := time.Date(now.Year(), now.Month(), now.Day(), bedtime, 0, 0, 0, time.Local)
 
 		if !bedtimeTime.After(times[suncalc.Night].Value) {
@@ -82,6 +94,7 @@ func SendTriggerEvents(
 		fmt.Printf("bedtime: %s\n", bedtimeTime.Format(time.RFC850))
 		fmt.Printf("night: %s\n", nightTime.Format(time.RFC850))
 
+	Today:
 		for {
 
 			select {
@@ -90,70 +103,61 @@ func SendTriggerEvents(
 				n := time.Now()
 				if n.Before(times[suncalc.Sunrise].Value.Add(time.Minute)) {
 					fmt.Printf("triggered %s @ %s\n", Sunrise, n.Format(time.RFC850))
-					ev <- Sunrise
+					triggers <- Sunrise
 				} else {
 					fmt.Printf("skipped %s @ %s\n", Sunrise, n.Format(time.RFC850))
-					sk <- Sunrise
 				}
 
 			case <-noonTimer.C:
 				n := time.Now()
 				if n.Before(times[suncalc.SolarNoon].Value.Add(time.Minute)) {
 					fmt.Printf("triggered %s @ %s\n", Noon, n.Format(time.RFC850))
-					ev <- Noon
+					triggers <- Noon
 				} else {
 					fmt.Printf("skipped %s @ %s\n", Noon, n.Format(time.RFC850))
-					sk <- Noon
 				}
 
 			case <-sunsetTimer.C:
 				n := time.Now()
 				if n.Before(times[suncalc.Sunset].Value.Add(time.Minute)) {
 					fmt.Printf("triggered %s @ %s\n", Sunset, n.Format(time.RFC850))
-					ev <- Sunset
+					triggers <- Sunset
 				} else {
 					fmt.Printf("skipped %s @ %s\n", Sunset, n.Format(time.RFC850))
-					sk <- Sunset
 				}
 
 			case <-bedtimeTimer.C:
 				n := time.Now()
 				if n.Before(bedtimeTime.Add(time.Minute)) {
 					fmt.Printf("triggered %s @ %s\n", Bedtime, n.Format(time.RFC850))
-					ev <- Bedtime
+					triggers <- Bedtime
 				} else {
 					fmt.Printf("skipped %s @ %s\n", Bedtime, n.Format(time.RFC850))
-					sk <- Bedtime
 				}
 
 			case <-eveningTimer.C:
 				n := time.Now()
 				if n.Before(times[suncalc.Night].Value.Add(time.Minute)) {
 					fmt.Printf("triggered %s @ %s\n", Evening, n.Format(time.RFC850))
-					ev <- Evening
+					triggers <- Evening
 				} else {
 					fmt.Printf("skipped %s @ %s\n", Evening, n.Format(time.RFC850))
-					sk <- Evening
 				}
 
 			case <-nightTimer.C:
 				n := time.Now()
 				if n.Before(nightTime.Add(time.Minute)) {
 					fmt.Printf("triggered %s @ %s\n", Night, n.Format(time.RFC850))
-					ev <- Night
+					triggers <- Night
 				} else {
 					fmt.Printf("skipped %s @ %s\n", Night, n.Format(time.RFC850))
-					sk <- Night
 				}
-				fmt.Printf("automation triggers worker thread exiting after final event of the day @ %s\n", n.Format(time.RFC850))
-				return
+				break Today
 
-			case <-term:
+			case <-terminate:
 				fmt.Printf("automation triggers worker thread terminated @ %s\n", time.Now().Format(time.RFC850))
 				return
 			}
 		}
-	}()
-
-	return
+	}
 }

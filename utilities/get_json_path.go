@@ -4,28 +4,7 @@ package utilities
 
 import (
 	"fmt"
-	"strings"
 )
-
-// Return the value specified by the given path in the given map. Paths are "/"
-// delimited sequences of keys. For example, "foo" is equivalent to m["foo"]
-// while "foo/bar" is equivalent to m["foo"]["bar"]. For composite keys, each
-// intermediate container is assumed to be a map[string]any.
-func GetJSONPathString[Value any](
-
-	path string,
-	m map[string]any,
-
-) (
-
-	value Value,
-	err error,
-
-) {
-
-	value, err = GetJSONPath[Value](strings.Split(path, "/"), m)
-	return
-}
 
 // Return the value specified by the given path in the given map. For example,
 // {"foo"} is equivalent to m["foo"] while {"foo", ""bar"} is equivalent to
@@ -33,8 +12,8 @@ func GetJSONPathString[Value any](
 // container is assumed to be a map[string]any.
 func GetJSONPath[Value any](
 
-	path []string,
 	m map[string]any,
+	path ...string,
 
 ) (
 
@@ -68,7 +47,7 @@ func GetJSONPath[Value any](
 			return
 		}
 		path = path[1:]
-		value, err = GetJSONPath[Value](path, c)
+		value, err = GetJSONPath[Value](c, path...)
 
 	} else if value, ok = a.(Value); !ok {
 
