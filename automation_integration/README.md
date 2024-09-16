@@ -2,10 +2,10 @@ Copyright 2024 Kirk Rader
 
 # Manual Integration Tests for Home Automation Interfaces
 
-This console application sends the results of various interactions to `stdout`.
-It supports querying device configuration data from either or both of a
-hard-coded collection of Philips Hue "bridges" and a PowerView "hub." It does
-so by using the software interfaces implemented by the
+This console application sends the results of various "smart" device
+interactions to `stdout`. It supports querying device configuration data from
+either or both of a hard-coded collection of Philips Hue "bridges" and a
+PowerView "hub." It does so by using the software interfaces implemented by the
 [../automation/hue/README.md](../automation/hue/README.md) and
 [../automation/powerview/README.md](../automation/powerview/README.md)
 packages.
