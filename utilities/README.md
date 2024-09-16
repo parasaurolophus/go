@@ -36,6 +36,46 @@ func CloseAndWait[V any](values chan<- V, await <-chan any)
 
     See StartWorker
 
+func GetAttribute[Value any](m map[string]any, key string) (value Value, err error)
+    Convert the value of the specified key in the given map to the specified
+    type.
+
+func GetJSONPath[Value any](
+
+        path []string,
+        m map[string]any,
+
+) (
+
+        value Value,
+        err error,
+
+)
+    Return the value specified by the given path in the given map. For example,
+    {"foo"} is equivalent to m["foo"] while {"foo", ""bar"} is equivalent to
+    m["foo"]["bar"]. For paths with more than one entry, each intermediate
+    container is assumed to be a map[string]any.
+
+func GetJSONPathString[Value any](
+
+        path string,
+        m map[string]any,
+
+) (
+
+        value Value,
+        err error,
+
+)
+    Return the value specified by the given path in the given map. Paths are "/"
+    delimited sequences of keys. For example, "foo" is equivalent to m["foo"]
+    while "foo/bar" is equivalent to m["foo"]["bar"]. For composite keys,
+    each intermediate container is assumed to be a map[string]any.
+
+func GetNumericAttribute[Value Number](m map[string]any, key string) (value Value, err error)
+    Convert the value of the specified key in the given map to the specified
+    type of number.
+
 func MakeCSVConsumer(
 
         writer *csv.Writer,
@@ -75,6 +115,9 @@ func MakeCSVGenerator(
     as to support CSV's without a headers row.
 
     See ProcessBatch, MakeCSVConsumer
+
+func ParseNumber[Value Number](s string) (value Value, err error)
+    Parse the given string as the specified type of number.
 
 func ProcessBatch[Input any, Output any](
 
@@ -208,25 +251,11 @@ type CSVTransformerParameters struct {
     MakeCSVGenerator.
 
     See ProcessBatch, MakeCSVGenerator, MakeCSVConsumer
-```
 
-Here is a more legible version of the ASCII art diagram in the doc comment for
-`ProcessBatch`:
-
-```mermaid
-graph LR
-
-    transform1[transform]
-    transformn[transform]
-    note[concurrent<br>goroutines]
-
-    note -.- transformn
-    generate -- transformers<br>channel<br>1 ---> transform1
-    transform1 -- consumer<br>channel --> consume
-    generate -- transformers<br>channel<br>n ---> transformn
-    transformn -- consumer<br>channel --> consume
-    note -.-transform1
-
-    class note floating-text
-    classDef floating-text stroke: none
+type Number interface {
+        int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64 | float32 | float64
+}
+    Type constraint for arbitrary numeric conversions. Note that this excludes
+    complex64 and complex128 because they do not support direct casting to and
+    from the other numeric types.
 ```
