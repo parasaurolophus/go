@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"net/http"
 	"os"
 	"parasaurolophus/automation/hue"
 	"parasaurolophus/automation/powerview"
@@ -63,14 +62,14 @@ func main() {
 	///////////////////////////////////////////////////////////////////////////
 	// invoke powerview hub API
 
-	model, err := powerview.GetModel(powerviewAddr)
+	powerviewModel, err := powerview.GetModel(powerviewAddr)
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(3)
 	}
 
-	_ = encoder.Encode(model)
+	_ = encoder.Encode(powerviewModel)
 
 	// room := model["Default Room"]
 	// scene := room.Scenes[0]
@@ -89,15 +88,30 @@ func main() {
 	defer utilities.CloseAndWait(terminate, triggersAwait)
 
 	///////////////////////////////////////////////////////////////////////////
-	// subscribe to SSE messages from two hue briges and invoke the synchronous
-	// API on each
+	// construct the ground floor and basement hue bridge models
 
-	groundFloorItems, groundFloorErrors, groundFloorTerminate, groundFloorAwait, err := hue.ReceiveSSE(
-		groundFloorAddr,
-		groundFloorKey,
-		onHueConnect,
-		onHueDisconnect,
-	)
+	groundFloorBridge, err := hue.NewBridge("Ground Floor", groundFloorAddr, groundFloorKey)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ground floor: %s\n", err.Error())
+		os.Exit(7)
+	}
+
+	_ = encoder.Encode(groundFloorBridge)
+
+	basementBridge, err := hue.NewBridge("Basement", basementAddr, basementKey)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "basement: %s\n", err.Error())
+		os.Exit(8)
+	}
+
+	_ = encoder.Encode(basementBridge)
+
+	///////////////////////////////////////////////////////////////////////////
+	// subscribe to SSE messages from both hue briges and invoke the
+	// synchronous API on each
+
+	groundFloorItems, groundFloorErrors, groundFloorTerminate, groundFloorAwait, err :=
+		groundFloorBridge.ReceiveSSE(onHueConnect, onHueDisconnect)
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
@@ -106,12 +120,8 @@ func main() {
 
 	defer utilities.CloseAndWait(groundFloorTerminate, groundFloorAwait)
 
-	basementItems, basementErrors, basementTerminate, basementAwait, err := hue.ReceiveSSE(
-		basementAddr,
-		basementKey,
-		onHueConnect,
-		onHueDisconnect,
-	)
+	basementItems, basementErrors, basementTerminate, basementAwait, err :=
+		basementBridge.ReceiveSSE(onHueConnect, onHueDisconnect)
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
@@ -119,20 +129,6 @@ func main() {
 	}
 
 	defer utilities.CloseAndWait(basementTerminate, basementAwait)
-
-	resources, err := hue.SendHTTP(groundFloorAddr, groundFloorKey, http.MethodGet, "resource", nil)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "ground floor: %s\n", err.Error())
-		os.Exit(7)
-	}
-	_ = encoder.Encode(resources)
-
-	resources, err = hue.SendHTTP(basementAddr, basementKey, http.MethodGet, "resource", nil)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "basement: %s\n", err.Error())
-		os.Exit(8)
-	}
-	_ = encoder.Encode(resources)
 
 	///////////////////////////////////////////////////////////////////////////
 	// handle the asynchronous events from all of the above

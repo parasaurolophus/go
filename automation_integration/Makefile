@@ -1,4 +1,4 @@
-all: test
+all: cleanall build
 
 clean:
 	go clean
@@ -10,7 +10,5 @@ cleanall:
 build:
 	go build
 
-test:
-	$(MAKE) cleanall
-	$(MAKE) build
+test: all
 	./automation_integration
