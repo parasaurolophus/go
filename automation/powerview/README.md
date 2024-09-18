@@ -6,20 +6,24 @@ Copyright 2024 Kirk Rader
 package powerview // import "parasaurolophus/automation/powerview"
 
 
-FUNCTIONS
-
-func ActivateScene(address string, sceneId int) (response any, err error)
-    Invoke the API exposed by the PowerView hub at the specified address.
-
-
 TYPES
 
-type Model map[string]Room
+type Hub struct {
+        Rooms map[string]Room `json:"rooms"`
+
+        // Has unexported fields.
+}
     In-memory model for a powerview home.
 
-func GetModel(address string) (model Model, err error)
+func NewHub(address string) (hub Hub, err error)
     Get the in-memory representation of the current configuration for all scenes
     in all rooms from the PowerView hub at the specified address.
+
+func (hub Hub) ActivateScene(scene Scene) (err error)
+    Send a command to the given PowerView hub to activate the given scene.
+
+func (hub *Hub) Refresh() (err error)
+    Load the rooms data for the given hub by calling the PowerView API.
 
 type Room struct {
         Id     int     `json:"id"`
