@@ -62,14 +62,14 @@ func main() {
 	///////////////////////////////////////////////////////////////////////////
 	// invoke powerview hub API
 
-	powerviewModel, err := powerview.GetModel(powerviewAddr)
+	powerviewHub, err := powerview.NewHub(powerviewAddr)
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(3)
 	}
 
-	_ = encoder.Encode(powerviewModel)
+	_ = encoder.Encode(powerviewHub)
 
 	// room := model["Default Room"]
 	// scene := room.Scenes[0]

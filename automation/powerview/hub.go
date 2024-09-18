@@ -12,13 +12,37 @@ import (
 
 type (
 
-	// Intermediate data model used to represent raw response from the
+	// In-memory model for a powerview scene.
+	Scene struct {
+		Id     int    `json:"id"`
+		Name   string `json:"name"`
+		RoomId int    `json:"roomId"`
+	}
+
+	// In-memory model for a powerview room.
+	Room struct {
+		Id     int     `json:"id"`
+		Name   string  `json:"name"`
+		Scenes []Scene `json:"scenes,omitempty"`
+	}
+
+	// In-memory model for a powerview home.
+	Hub struct {
+		Rooms map[string]Room `json:"rooms"`
+
+		address string
+	}
+)
+
+type (
+
+	// Intermediate data model used to represent a raw response from the
 	// api/scenes endpoint.
 	scenesData struct {
 		SceneData []Scene `json:"sceneData"`
 	}
 
-	// Intermediate data model used to represent raw response from the
+	// Intermediate data model used to represent a raw response from the
 	// api/rooms endpoint.
 	roomsData struct {
 		RoomData []Room `json:"roomData"`
@@ -32,27 +56,65 @@ type (
 
 // Get the in-memory representation of the current configuration for all scenes
 // in all rooms from the PowerView hub at the specified address.
-func GetModel(address string) (model Model, err error) {
+func NewHub(address string) (hub Hub, err error) {
+
+	hub = Hub{
+		address: address,
+		Rooms:   map[string]Room{},
+	}
+
+	if err = hub.Refresh(); err != nil {
+		return
+	}
+
+	return
+}
+
+// Load the rooms data for the given hub by calling the PowerView API.
+func (hub *Hub) Refresh() (err error) {
 
 	var scenes []Scene
-	if scenes, err = getScenes(address); err != nil {
+
+	if scenes, err = getScenes(hub.address); err != nil {
 		return
 	}
 
 	var rooms []Room
-	if rooms, err = getRooms(address, scenes); err != nil {
+
+	if rooms, err = getRooms(hub.address, scenes); err != nil {
 		return
 	}
-
-	model = Model{}
 
 	for _, room := range rooms {
 
 		if len(room.Scenes) > 0 {
-			model[room.Name] = room
+			hub.Rooms[room.Name] = room
 		}
 	}
 
+	return
+}
+
+// Send a command to the given PowerView hub to activate the given scene.
+func (hub Hub) ActivateScene(scene Scene) (err error) {
+
+	url := fmt.Sprintf(`http://%s/scenes?sceneId=%d`, hub.address, scene.Id)
+
+	var resp *http.Response
+	if resp, err = http.DefaultClient.Get(url); err != nil {
+		return
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		err = fmt.Errorf("%d: %s", resp.StatusCode, resp.Status)
+		_, _ = io.ReadAll(resp.Body)
+		resp.Body.Close()
+		return
+	}
+
+	var response any
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&response)
 	return
 }
 
