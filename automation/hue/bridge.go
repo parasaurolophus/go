@@ -38,30 +38,29 @@ type (
 	// way that makes them easy and efficient to use in a home automation
 	// application (unlike hue's bloated and bizarre data model),
 	Bridge struct {
-		Label  string           `json:"label"`
-		Groups map[string]Group `json:"groups"`
-
-		address string
+		Label   string           `json:"label"`
+		Address string           `json:"address"`
+		Groups  map[string]Group `json:"groups"`
 		key     string
 	}
 )
 
 // Load a Bridge from the specified hue bridge.
-func NewBridge(label, address, key string) (model Bridge, err error) {
+func NewBridge(label, address, key string) (bridge Bridge, err error) {
 
-	model = Bridge{
+	bridge = Bridge{
 		Label:   label,
-		address: address,
+		Address: address,
 		key:     key,
 	}
 
-	err = model.Refresh()
+	err = bridge.Refresh()
 
 	return
 }
 
 // Send a PUT command to activate the specified scene.
-func (model Bridge) ActivateScene(groupName, sceneName string) (err error) {
+func (bridge Bridge) ActivateScene(groupName, sceneName string) (err error) {
 
 	var (
 		group Group
@@ -69,8 +68,8 @@ func (model Bridge) ActivateScene(groupName, sceneName string) (err error) {
 		ok    bool
 	)
 
-	if group, ok = model.Groups[groupName]; !ok {
-		err = fmt.Errorf("no group %s found in bridge %s", groupName, model.Label)
+	if group, ok = bridge.Groups[groupName]; !ok {
+		err = fmt.Errorf("no group %s found in bridge %s", groupName, bridge.Label)
 		return
 	}
 
@@ -81,13 +80,13 @@ func (model Bridge) ActivateScene(groupName, sceneName string) (err error) {
 
 	uri := fmt.Sprintf("/resource/scene/%s", scene.Id)
 	payload := map[string]any{"recall": map[string]any{"action": "active"}}
-	_, err = model.Send(http.MethodPut, uri, payload)
+	_, err = bridge.Send(http.MethodPut, uri, payload)
 	return
 }
 
-func (model Bridge) ReceiveSSE(
+func (bridge Bridge) ReceiveSSE(
 
-	onConnect, onDisconnect func(string),
+	onConnect, onDisconnect func(Bridge),
 
 ) (
 
@@ -119,7 +118,7 @@ func (model Bridge) ReceiveSSE(
 	// bridge at the specified address
 	client := sse.NewClient(
 
-		fmt.Sprintf(`https://%s/eventstream/clip/v2`, model.address),
+		fmt.Sprintf(`https://%s/eventstream/clip/v2`, bridge.Address),
 
 		func(c *sse.Client) {
 
@@ -128,18 +127,18 @@ func (model Bridge) ReceiveSSE(
 			}
 
 			c.Headers = map[string]string{
-				"hue-application-key": model.key,
+				"hue-application-key": bridge.key,
 			}
 
 			c.OnConnect(func(*sse.Client) {
 				if onConnect != nil {
-					onConnect(model.Label)
+					onConnect(bridge)
 				}
 			})
 
 			c.OnDisconnect(func(*sse.Client) {
 				if onDisconnect != nil {
-					onDisconnect(model.Label)
+					onDisconnect(bridge)
 				}
 			})
 		},
@@ -195,13 +194,13 @@ func (model Bridge) ReceiveSSE(
 }
 
 // Send a GET command to update the given Model.
-func (model *Bridge) Refresh() (err error) {
+func (bridge *Bridge) Refresh() (err error) {
 
 	var response Response
 
-	model.Groups = map[string]Group{}
+	bridge.Groups = map[string]Group{}
 
-	if response, err = model.Send(http.MethodGet, "/resource", nil); err != nil {
+	if response, err = bridge.Send(http.MethodGet, "/resource", nil); err != nil {
 		return
 	}
 
@@ -234,7 +233,7 @@ func (model *Bridge) Refresh() (err error) {
 			ok    bool
 		)
 
-		if group, ok = model.Groups[groupName]; !ok {
+		if group, ok = bridge.Groups[groupName]; !ok {
 
 			var (
 				resourceType, ownerId, resourceId string
@@ -316,15 +315,15 @@ func (model *Bridge) Refresh() (err error) {
 			}
 		}
 
-		model.Groups[groupName] = group
+		bridge.Groups[groupName] = group
 	}
 
 	return
 }
 
-func (model Bridge) Send(method, uri string, payload any) (response Response, err error) {
+func (bridge Bridge) Send(method, uri string, payload any) (response Response, err error) {
 
-	url := fmt.Sprintf(`https://%s/clip/v2/%s`, model.address, uri)
+	url := fmt.Sprintf(`https://%s/clip/v2/%s`, bridge.Address, uri)
 
 	var body io.Reader
 
@@ -349,7 +348,7 @@ func (model Bridge) Send(method, uri string, payload any) (response Response, er
 		return
 	}
 
-	req.Header.Set("hue-application-key", model.key)
+	req.Header.Set("hue-application-key", bridge.key)
 	var resp *http.Response
 
 	transport := &http.Transport{
@@ -379,15 +378,15 @@ func (model Bridge) Send(method, uri string, payload any) (response Response, er
 }
 
 // Send a PUT command to turn on or off the specified group.
-func (model Bridge) SetGroupState(groupName string, on bool) (err error) {
+func (bridge Bridge) SetGroupState(groupName string, on bool) (err error) {
 
 	var (
 		group Group
 		ok    bool
 	)
 
-	if group, ok = model.Groups[groupName]; !ok {
-		err = fmt.Errorf("no group %s found in bridge %s", groupName, model.Label)
+	if group, ok = bridge.Groups[groupName]; !ok {
+		err = fmt.Errorf("no group %s found in bridge %s", groupName, bridge.Label)
 		return
 	}
 
@@ -399,7 +398,7 @@ func (model Bridge) SetGroupState(groupName string, on bool) (err error) {
 		},
 	}
 
-	_, err = model.Send(http.MethodPut, uri, payload)
+	_, err = bridge.Send(http.MethodPut, uri, payload)
 	return
 }
 

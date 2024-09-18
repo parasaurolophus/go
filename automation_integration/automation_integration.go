@@ -25,7 +25,7 @@ func init() {
 
 	if output, err = os.Create("output.txt"); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(1)
+		return
 	}
 }
 
@@ -45,7 +45,7 @@ func main() {
 
 	if !ok {
 		fmt.Fprintln(os.Stderr, "error reading environment variables")
-		os.Exit(2)
+		return
 	}
 
 	quit := make(chan any)
@@ -66,7 +66,7 @@ func main() {
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(3)
+		return
 	}
 
 	_ = encoder.Encode(powerviewHub)
@@ -82,7 +82,7 @@ func main() {
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(4)
+		return
 	}
 
 	defer utilities.CloseAndWait(terminate, triggersAwait)
@@ -93,7 +93,7 @@ func main() {
 	groundFloorBridge, err := hue.NewBridge("Ground Floor", groundFloorAddr, groundFloorKey)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ground floor: %s\n", err.Error())
-		os.Exit(7)
+		return
 	}
 
 	_ = encoder.Encode(groundFloorBridge)
@@ -101,7 +101,7 @@ func main() {
 	basementBridge, err := hue.NewBridge("Basement", basementAddr, basementKey)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "basement: %s\n", err.Error())
-		os.Exit(8)
+		return
 	}
 
 	_ = encoder.Encode(basementBridge)
@@ -115,7 +115,7 @@ func main() {
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(5)
+		return
 	}
 
 	defer utilities.CloseAndWait(groundFloorTerminate, groundFloorAwait)
@@ -125,7 +125,7 @@ func main() {
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(6)
+		return
 	}
 
 	defer utilities.CloseAndWait(basementTerminate, basementAwait)
@@ -148,7 +148,7 @@ func main() {
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(9)
+		return
 	}
 }
 
@@ -267,14 +267,14 @@ func handleEvents(
 	}
 }
 
-func onHueConnect(address string) {
+func onHueConnect(bridge hue.Bridge) {
 
-	fmt.Fprintf(output, "hue hub at %s connected @ %s\n", address, time.Now().Format(time.RFC850))
+	fmt.Fprintf(output, "hue hub at %s connected @ %s\n", bridge.Label, time.Now().Format(time.RFC850))
 }
 
-func onHueDisconnect(address string) {
+func onHueDisconnect(bridge hue.Bridge) {
 
-	err := fmt.Errorf("hue hub at %s disconnected @ %s", address, time.Now().Format(time.RFC850))
+	err := fmt.Errorf("hue hub at %s disconnected @ %s", bridge.Label, time.Now().Format(time.RFC850))
 	fmt.Fprintln(output, err.Error())
-	os.Exit(9)
+	os.Exit(10)
 }
