@@ -9,24 +9,30 @@ package hue // import "parasaurolophus/automation/hue"
 TYPES
 
 type Bridge struct {
-        Label  string           `json:"label"`
-        Groups map[string]Group `json:"groups"`
+        Label string `json:"label"`
 
         // Has unexported fields.
 }
-    Fields of interest from /resource endpoint's response, represented in a way
-    that makes them easy and efficient to use in a home automation application
-    (unlike hue's bloated and bizarre data model),
+    Parameters required to access the API exposed by a particular Hue Bridge.
 
-func NewBridge(label, address, key string) (model Bridge, err error)
-    Load a Bridge from the specified hue bridge.
+func NewBridge(label, address, key string) Bridge
+    Initialize and return a Bridge.
 
-func (model Bridge) ActivateScene(groupName, sceneName string) (err error)
-    Send a PUT command to activate the specified scene.
+func (bridge Bridge) Activate(scene Scene) (err error)
+    Send a PUT command to activate the given scene.
 
-func (model Bridge) ReceiveSSE(
+func (bridge Bridge) Model() (groups Model, err error)
+    Send a GET command to return the Model representing the current state of the
+    given Model.
 
-        onConnect, onDisconnect func(string),
+func (bridge Bridge) Put(group Group) (err error)
+    Send a PUT command to turn on or off the specified group.
+
+func (bridge Bridge) Send(method, uri string, payload any) (response Response, err error)
+
+func (bridge Bridge) Subscribe(
+
+        onConnect, onDisconnect func(Bridge),
 
 ) (
 
@@ -37,14 +43,7 @@ func (model Bridge) ReceiveSSE(
         err error,
 
 )
-
-func (model *Bridge) Refresh() (err error)
-    Send a GET command to update the given Model.
-
-func (model Bridge) Send(method, uri string, payload any) (response Response, err error)
-
-func (model Bridge) SetGroupState(groupName string, on bool) (err error)
-    Send a PUT command to turn on or off the specified group.
+    Subscribe to SSE messages from the given Bridge.
 
 type Group struct {
         Name           string           `json:"name"`
@@ -61,6 +60,11 @@ type Group struct {
 type Item map[string]any
     Alias for map[string]any used as the basic data model for the Hue Bridge API
     V2.
+
+type Model map[string]Group
+    Fields of interest from the Hue API V2 data model, transformed into a
+    useable structure (which Hue's bizzare and over-engineered structure is
+    not).
 
 type Response struct {
         Data   []Item `json:"data"`

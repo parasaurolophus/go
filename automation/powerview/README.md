@@ -9,21 +9,23 @@ package powerview // import "parasaurolophus/automation/powerview"
 TYPES
 
 type Hub struct {
-        Rooms map[string]Room `json:"rooms"`
+        Label string `json:"label"`
 
         // Has unexported fields.
 }
     In-memory model for a powerview home.
 
-func NewHub(address string) (hub Hub, err error)
-    Get the in-memory representation of the current configuration for all scenes
-    in all rooms from the PowerView hub at the specified address.
+func NewHub(label, address string) Hub
+    Initialize and return a Hub.
 
-func (hub Hub) ActivateScene(scene Scene) (err error)
+func (hub Hub) Activate(scene Scene) (err error)
     Send a command to the given PowerView hub to activate the given scene.
 
-func (hub *Hub) Refresh() (err error)
+func (hub Hub) Model() (model Model, err error)
     Load the rooms data for the given hub by calling the PowerView API.
+
+type Model map[string]Room
+    In-memory powerview data model.
 
 type Room struct {
         Id     int     `json:"id"`

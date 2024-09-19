@@ -62,14 +62,15 @@ func main() {
 	///////////////////////////////////////////////////////////////////////////
 	// invoke powerview hub API
 
-	powerviewHub, err := powerview.NewHub(powerviewAddr)
+	powerviewHub := powerview.NewHub("Shades", powerviewAddr)
+	powerviewModel, err := powerviewHub.Model()
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		return
 	}
 
-	_ = encoder.Encode(powerviewHub)
+	_ = encoder.Encode(powerviewModel)
 
 	// room := model["Default Room"]
 	// scene := room.Scenes[0]
@@ -90,28 +91,32 @@ func main() {
 	///////////////////////////////////////////////////////////////////////////
 	// construct the ground floor and basement hue bridge models
 
-	groundFloorBridge, err := hue.NewBridge("Ground Floor", groundFloorAddr, groundFloorKey)
+	groundFloorBridge := hue.NewBridge("Ground Floor", groundFloorAddr, groundFloorKey)
+	groundFloorModel, err := groundFloorBridge.Model()
+
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "ground floor: %s\n", err.Error())
 		return
 	}
 
-	_ = encoder.Encode(groundFloorBridge)
+	_ = encoder.Encode(groundFloorModel)
 
-	basementBridge, err := hue.NewBridge("Basement", basementAddr, basementKey)
+	basementBridge := hue.NewBridge("Basement", basementAddr, basementKey)
+	basementModel, err := basementBridge.Model()
+
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "basement: %s\n", err.Error())
 		return
 	}
 
-	_ = encoder.Encode(basementBridge)
+	_ = encoder.Encode(basementModel)
 
 	///////////////////////////////////////////////////////////////////////////
 	// subscribe to SSE messages from both hue briges and invoke the
 	// synchronous API on each
 
 	groundFloorItems, groundFloorErrors, groundFloorTerminate, groundFloorAwait, err :=
-		groundFloorBridge.ReceiveSSE(onHueConnect, onHueDisconnect)
+		groundFloorBridge.Subscribe(onHueConnect, onHueDisconnect)
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
@@ -121,7 +126,7 @@ func main() {
 	defer utilities.CloseAndWait(groundFloorTerminate, groundFloorAwait)
 
 	basementItems, basementErrors, basementTerminate, basementAwait, err :=
-		basementBridge.ReceiveSSE(onHueConnect, onHueDisconnect)
+		basementBridge.Subscribe(onHueConnect, onHueDisconnect)
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())

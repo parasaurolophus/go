@@ -26,10 +26,12 @@ type (
 		Scenes []Scene `json:"scenes,omitempty"`
 	}
 
+	// In-memory powerview data model.
+	Model map[string]Room
+
 	// In-memory model for a powerview home.
 	Hub struct {
-		Rooms map[string]Room `json:"rooms"`
-
+		Label   string `json:"label"`
 		address string
 	}
 )
@@ -54,49 +56,17 @@ type (
 	}
 )
 
-// Get the in-memory representation of the current configuration for all scenes
-// in all rooms from the PowerView hub at the specified address.
-func NewHub(address string) (hub Hub, err error) {
+// Initialize and return a Hub.
+func NewHub(label, address string) Hub {
 
-	hub = Hub{
+	return Hub{
+		Label:   label,
 		address: address,
-		Rooms:   map[string]Room{},
 	}
-
-	if err = hub.Refresh(); err != nil {
-		return
-	}
-
-	return
-}
-
-// Load the rooms data for the given hub by calling the PowerView API.
-func (hub *Hub) Refresh() (err error) {
-
-	var scenes []Scene
-
-	if scenes, err = getScenes(hub.address); err != nil {
-		return
-	}
-
-	var rooms []Room
-
-	if rooms, err = getRooms(hub.address, scenes); err != nil {
-		return
-	}
-
-	for _, room := range rooms {
-
-		if len(room.Scenes) > 0 {
-			hub.Rooms[room.Name] = room
-		}
-	}
-
-	return
 }
 
 // Send a command to the given PowerView hub to activate the given scene.
-func (hub Hub) ActivateScene(scene Scene) (err error) {
+func (hub Hub) Activate(scene Scene) (err error) {
 
 	url := fmt.Sprintf(`http://%s/scenes?sceneId=%d`, hub.address, scene.Id)
 
@@ -115,6 +85,33 @@ func (hub Hub) ActivateScene(scene Scene) (err error) {
 	var response any
 	decoder := json.NewDecoder(resp.Body)
 	err = decoder.Decode(&response)
+	return
+}
+
+// Load the rooms data for the given hub by calling the PowerView API.
+func (hub Hub) Model() (model Model, err error) {
+
+	var scenes []Scene
+
+	if scenes, err = getScenes(hub.address); err != nil {
+		return
+	}
+
+	var rooms []Room
+
+	if rooms, err = getRooms(hub.address, scenes); err != nil {
+		return
+	}
+
+	model = Model{}
+
+	for _, room := range rooms {
+
+		if len(room.Scenes) > 0 {
+			model[room.Name] = room
+		}
+	}
+
 	return
 }
 

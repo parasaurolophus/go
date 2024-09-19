@@ -16,15 +16,17 @@ import (
 
 type (
 
-	// Fields of interest from the /resource/scene/{id} endpoint's response.
-	Scene struct {
-		Name string `json:"name"`
-		Id   string `json:"id"`
+	// Parameters required to access the API exposed by a particular Hue
+	// Bridge.
+	Bridge struct {
+		Label   string `json:"label"`
+		address string
+		key     string
 	}
 
 	// Fields of interest from /resource/bridge_home, /resource/room/{id} or
-	// /resource/zone/{id} endpoints' responses, plus relevant fields from
-	// related scene and grouped_light resources for the given group.
+	// /resource/zone/{id} endpoints' responses, plus relevant fields from related
+	// scene and grouped_light resources for the given group.
 	Group struct {
 		Name           string           `json:"name"`
 		Id             string           `json:"id"`
@@ -34,49 +36,34 @@ type (
 		Scenes         map[string]Scene `json:"scenes,omitempty"`
 	}
 
-	// Fields of interest from /resource endpoint's response, represented in a
-	// way that makes them easy and efficient to use in a home automation
-	// application (unlike hue's bloated and bizarre data model),
-	Bridge struct {
-		Label   string           `json:"label"`
-		Address string           `json:"address"`
-		Groups  map[string]Group `json:"groups"`
-		key     string
+	// Alias for map[string]any used as the basic data model for the Hue Bridge API
+	// V2.
+	Item map[string]any
+
+	// Fields of interest from the Hue API V2 data model, transformed into a
+	// useable structure (which Hue's bizzare and over-engineered structure is
+	// not).
+	Model map[string]Group
+
+	// Fields of interest from the /resource/scene/{id} endpoint's response.
+	Scene struct {
+		Name string `json:"name"`
+		Id   string `json:"id"`
 	}
 )
 
-// Load a Bridge from the specified hue bridge.
-func NewBridge(label, address, key string) (bridge Bridge, err error) {
+// Initialize and return a Bridge.
+func NewBridge(label, address, key string) Bridge {
 
-	bridge = Bridge{
+	return Bridge{
 		Label:   label,
-		Address: address,
+		address: address,
 		key:     key,
 	}
-
-	err = bridge.Refresh()
-
-	return
 }
 
-// Send a PUT command to activate the specified scene.
-func (bridge Bridge) ActivateScene(groupName, sceneName string) (err error) {
-
-	var (
-		group Group
-		scene Scene
-		ok    bool
-	)
-
-	if group, ok = bridge.Groups[groupName]; !ok {
-		err = fmt.Errorf("no group %s found in bridge %s", groupName, bridge.Label)
-		return
-	}
-
-	if scene, ok = group.Scenes[sceneName]; !ok {
-		err = fmt.Errorf("no scene %s found in group %s", sceneName, group.Name)
-		return
-	}
+// Send a PUT command to activate the given scene.
+func (bridge Bridge) Activate(scene Scene) (err error) {
 
 	uri := fmt.Sprintf("/resource/scene/%s", scene.Id)
 	payload := map[string]any{"recall": map[string]any{"action": "active"}}
@@ -84,121 +71,13 @@ func (bridge Bridge) ActivateScene(groupName, sceneName string) (err error) {
 	return
 }
 
-func (bridge Bridge) ReceiveSSE(
-
-	onConnect, onDisconnect func(Bridge),
-
-) (
-
-	items <-chan Item,
-	errors <-chan error,
-	terminate chan<- any,
-	await <-chan any,
-	err error,
-
-) {
-
-	// make the channels used to communicate with callers of this function
-	ev := make(chan Item)
-	er := make(chan error)
-	term := make(chan any)
-	aw := make(chan any)
-
-	// set the unidirectional channels returned as values by this function
-	items = ev
-	errors = er
-	terminate = term
-	await = aw
-
-	// make the channel used for communication between the worker goroutines
-	// launched as a side-effect of calling this function
-	rawEvents := make(chan *sse.Event)
-
-	// create the sse.Client used to subscribe to the raw SSE messages from the
-	// bridge at the specified address
-	client := sse.NewClient(
-
-		fmt.Sprintf(`https://%s/eventstream/clip/v2`, bridge.Address),
-
-		func(c *sse.Client) {
-
-			c.Connection.Transport = &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			}
-
-			c.Headers = map[string]string{
-				"hue-application-key": bridge.key,
-			}
-
-			c.OnConnect(func(*sse.Client) {
-				if onConnect != nil {
-					onConnect(bridge)
-				}
-			})
-
-			c.OnDisconnect(func(*sse.Client) {
-				if onDisconnect != nil {
-					onDisconnect(bridge)
-				}
-			})
-		},
-	)
-
-	// launch a goroutine to listen for raw SSE messages, forwarding them to
-	// the rawEvents channel
-	if err = client.SubscribeChanRaw(rawEvents); err != nil {
-		close(aw)
-		return
-	}
-
-	// launch a worker goroutine which consumes raw SSE messages from the
-	// subscribed channel and forwards them to the events and error channels
-	// returned by this function, as appropriate
-	go func() {
-
-		// signal that this worker goroutine has terminated
-		defer close(aw)
-
-		// signal the raw SSE listener goroutine to terminate
-		defer client.Unsubscribe(rawEvents)
-
-		for {
-
-			select {
-
-			// exit the worker goroutine with the terminate channel is signaled
-			case <-term:
-				return
-
-			// process raw SSE messages and forward them the the items channel
-			case event := <-rawEvents:
-				dataReader := bytes.NewReader(event.Data)
-				eventStreamReader := sse.NewEventStreamReader(dataReader, 65536)
-				marshaledJSON, err := eventStreamReader.ReadEvent()
-				if err != nil {
-					er <- err
-					continue
-				}
-				var datum []map[string]any
-				err = json.Unmarshal(marshaledJSON, &datum)
-				if err != nil {
-					er <- err
-					continue
-				}
-				walkRawMessage(ev, er, datum)
-			}
-		}
-	}()
-
-	return
-}
-
-// Send a GET command to update the given Model.
-func (bridge *Bridge) Refresh() (err error) {
+// Send a GET command to return the Model representing the current state of the
+// given Model.
+func (bridge Bridge) Model() (groups Model, err error) {
 
 	var response Response
 
-	bridge.Groups = map[string]Group{}
+	groups = Model{}
 
 	if response, err = bridge.Send(http.MethodGet, "/resource", nil); err != nil {
 		return
@@ -233,7 +112,7 @@ func (bridge *Bridge) Refresh() (err error) {
 			ok    bool
 		)
 
-		if group, ok = bridge.Groups[groupName]; !ok {
+		if group, ok = groups[groupName]; !ok {
 
 			var (
 				resourceType, ownerId, resourceId string
@@ -315,15 +194,140 @@ func (bridge *Bridge) Refresh() (err error) {
 			}
 		}
 
-		bridge.Groups[groupName] = group
+		groups[groupName] = group
 	}
+
+	return
+}
+
+// Send a PUT command to turn on or off the specified group.
+func (bridge Bridge) Put(group Group) (err error) {
+
+	uri := fmt.Sprintf("/resource/grouped_light/%s", group.GroupedLightId)
+
+	payload := map[string]any{
+		"on": map[string]any{
+			"on": group.On,
+		},
+	}
+
+	_, err = bridge.Send(http.MethodPut, uri, payload)
+	return
+}
+
+// Subscribe to SSE messages from the given Bridge.
+func (bridge Bridge) Subscribe(
+
+	onConnect, onDisconnect func(Bridge),
+
+) (
+
+	items <-chan Item,
+	errors <-chan error,
+	terminate chan<- any,
+	await <-chan any,
+	err error,
+
+) {
+
+	// make the channels used to communicate with callers of this function
+	ev := make(chan Item)
+	er := make(chan error)
+	term := make(chan any)
+	aw := make(chan any)
+
+	// set the unidirectional channels returned as values by this function
+	items = ev
+	errors = er
+	terminate = term
+	await = aw
+
+	// make the channel used for communication between the worker goroutines
+	// launched as a side-effect of calling this function
+	rawEvents := make(chan *sse.Event)
+
+	// create the sse.Client used to subscribe to the raw SSE messages from the
+	// bridge at the specified address
+	client := sse.NewClient(
+
+		fmt.Sprintf(`https://%s/eventstream/clip/v2`, bridge.address),
+
+		func(c *sse.Client) {
+
+			c.Connection.Transport = &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			}
+
+			c.Headers = map[string]string{
+				"hue-application-key": bridge.key,
+			}
+
+			c.OnConnect(func(*sse.Client) {
+				if onConnect != nil {
+					onConnect(bridge)
+				}
+			})
+
+			c.OnDisconnect(func(*sse.Client) {
+				if onDisconnect != nil {
+					onDisconnect(bridge)
+				}
+			})
+		},
+	)
+
+	// launch a goroutine to listen for raw SSE messages, forwarding them to
+	// the rawEvents channel
+	if err = client.SubscribeChanRaw(rawEvents); err != nil {
+		close(aw)
+		return
+	}
+
+	// launch a worker goroutine which consumes raw SSE messages from the
+	// subscribed channel and forwards them to the events and error channels
+	// returned by this function, as appropriate
+	go func() {
+
+		// signal that this worker goroutine has terminated
+		defer close(aw)
+
+		// signal the raw SSE listener goroutine to terminate
+		defer client.Unsubscribe(rawEvents)
+
+		for {
+
+			select {
+
+			// exit the worker goroutine with the terminate channel is signaled
+			case <-term:
+				return
+
+			// process raw SSE messages and forward them the the items channel
+			case event := <-rawEvents:
+				dataReader := bytes.NewReader(event.Data)
+				eventStreamReader := sse.NewEventStreamReader(dataReader, 65536)
+				marshaledJSON, err := eventStreamReader.ReadEvent()
+				if err != nil {
+					er <- err
+					continue
+				}
+				var datum []map[string]any
+				err = json.Unmarshal(marshaledJSON, &datum)
+				if err != nil {
+					er <- err
+					continue
+				}
+				walkRawMessage(ev, er, datum)
+			}
+		}
+	}()
 
 	return
 }
 
 func (bridge Bridge) Send(method, uri string, payload any) (response Response, err error) {
 
-	url := fmt.Sprintf(`https://%s/clip/v2/%s`, bridge.Address, uri)
+	url := fmt.Sprintf(`https://%s/clip/v2/%s`, bridge.address, uri)
 
 	var body io.Reader
 
@@ -374,31 +378,6 @@ func (bridge Bridge) Send(method, uri string, payload any) (response Response, e
 
 	}
 
-	return
-}
-
-// Send a PUT command to turn on or off the specified group.
-func (bridge Bridge) SetGroupState(groupName string, on bool) (err error) {
-
-	var (
-		group Group
-		ok    bool
-	)
-
-	if group, ok = bridge.Groups[groupName]; !ok {
-		err = fmt.Errorf("no group %s found in bridge %s", groupName, bridge.Label)
-		return
-	}
-
-	uri := fmt.Sprintf("/resource/grouped_light/%s", group.GroupedLightId)
-
-	payload := map[string]any{
-		"on": map[string]any{
-			"on": on,
-		},
-	}
-
-	_, err = bridge.Send(http.MethodPut, uri, payload)
 	return
 }
 
