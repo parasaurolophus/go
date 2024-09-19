@@ -15,29 +15,15 @@ import (
 	"time"
 )
 
-var (
-	output *os.File
-)
-
-func init() {
-
-	var err error
-
-	if output, err = os.Create("output.txt"); err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		return
-	}
-}
-
 func main() {
 
 	///////////////////////////////////////////////////////////////////////////
 	// initialize
 
-	help, bedtime := parseArgs()
+	bedtime, err := parseArgs()
 
-	if help {
-		flag.Usage()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		return
 	}
 
@@ -56,9 +42,6 @@ func main() {
 		quit <- buffer[0]
 	}()
 
-	encoder := json.NewEncoder(output)
-	encoder.SetIndent("", "  ")
-
 	///////////////////////////////////////////////////////////////////////////
 	// invoke powerview hub API
 
@@ -70,7 +53,7 @@ func main() {
 		return
 	}
 
-	_ = encoder.Encode(powerviewModel)
+	writeOuputJSON("powerview_model.json", powerviewModel)
 
 	// room := model["Default Room"]
 	// scene := room.Scenes[0]
@@ -95,11 +78,11 @@ func main() {
 	groundFloorModel, err := groundFloorBridge.Model()
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ground floor: %s\n", err.Error())
+		fmt.Fprintln(os.Stderr, err.Error())
 		return
 	}
 
-	_ = encoder.Encode(groundFloorModel)
+	writeOuputJSON("ground_floor_hue_model.json", groundFloorModel)
 
 	basementBridge := hue.NewBridge("Basement", basementAddr, basementKey)
 	basementModel, err := basementBridge.Model()
@@ -109,7 +92,7 @@ func main() {
 		return
 	}
 
-	_ = encoder.Encode(basementModel)
+	writeOuputJSON("basement_hue_model.json", basementModel)
 
 	///////////////////////////////////////////////////////////////////////////
 	// subscribe to SSE messages from both hue briges and invoke the
@@ -138,30 +121,123 @@ func main() {
 	///////////////////////////////////////////////////////////////////////////
 	// handle the asynchronous events from all of the above
 
-	err = handleEvents(
-
-		triggers,
-		triggersAwait,
-		groundFloorItems,
-		groundFloorErrors,
-		groundFloorAwait,
-		basementItems,
-		basementErrors,
-		basementAwait,
-		quit,
+	var (
+		groundFloorEventsFile    *os.File
+		groundFloorEventCount    = 0
+		groundFloorEventsEncoder *json.Encoder
+		basementEventsFile       *os.File
+		basementEventCount       = 0
+		basementEventsEncoder    *json.Encoder
+		triggerEventsFile        *os.File
 	)
+
+	groundFloorEventsFile, err = os.Create("ground_floor_hue_events.json")
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		return
 	}
+
+	defer groundFloorEventsFile.Close()
+	defer fmt.Fprintln(groundFloorEventsFile, "]")
+
+	fmt.Fprintln(groundFloorEventsFile, "[")
+	groundFloorEventsEncoder = json.NewEncoder(groundFloorEventsFile)
+	groundFloorEventsEncoder.SetIndent("  ", "  ")
+	basementEventsFile, err = os.Create("basement_hue_events.json")
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		return
+	}
+
+	defer basementEventsFile.Close()
+	defer fmt.Fprintln(basementEventsFile, "]")
+
+	fmt.Fprintln(basementEventsFile, "[")
+	basementEventsEncoder = json.NewEncoder(basementEventsFile)
+	basementEventsEncoder.SetIndent("  ", "  ")
+	triggerEventsFile, err = os.Create("trigger_events.txt")
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		return
+	}
+
+	defer triggerEventsFile.Close()
+
+HandleEvents:
+	for {
+
+		select {
+
+		case groundFloorEvent := <-groundFloorItems:
+			if groundFloorEventCount > 0 {
+				fmt.Fprintln(groundFloorEventsFile, ",")
+			}
+			groundFloorEventCount++
+			err = groundFloorEventsEncoder.Encode(groundFloorEvent)
+			if err != nil {
+				break HandleEvents
+			}
+
+		case err = <-groundFloorErrors:
+			break HandleEvents
+
+		case <-groundFloorAwait:
+			break HandleEvents
+
+		case basementEvent := <-basementItems:
+			if basementEventCount > 0 {
+				fmt.Fprintln(basementEventsFile, ",")
+			}
+			basementEventCount++
+			err = basementEventsEncoder.Encode(basementEvent)
+			if err != nil {
+				break HandleEvents
+			}
+
+		case err = <-basementErrors:
+			break HandleEvents
+
+		case <-basementAwait:
+			break HandleEvents
+
+		case event := <-triggers:
+			fmt.Fprintf(triggerEventsFile, "triggered %s @ %s\n", event, time.Now().Format(time.RFC850))
+
+		case <-triggersAwait:
+			break HandleEvents
+
+		case <-quit:
+			break HandleEvents
+		}
+	}
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+	}
 }
 
-func parseArgs() (help bool, bedtime int) {
+func parseArgs() (
 
-	flag.BoolVar(&help, "help", false, "display usage and exit")
-	flag.IntVar(&bedtime, "bedtime", 22, "desired bedtime (0-23)")
-	flag.Parse()
+	bedtime int,
+	err error,
+
+) {
+
+	help := false
+
+	flagSet := flag.NewFlagSet("automation_integration", flag.ContinueOnError)
+	flagSet.BoolVar(&help, "help", false, "display usage and exit")
+	flagSet.IntVar(&bedtime, "bedtime", 22, "desired bedtime (0-23)")
+	err = flagSet.Parse(os.Args)
+
+	if help {
+		flagSet.Usage()
+		err = fmt.Errorf("exiting")
+	}
+
 	return
 }
 
@@ -215,71 +291,33 @@ func getEnvVars() (
 	return
 }
 
-func handleEvents(
-
-	triggers <-chan trigger.Trigger,
-	triggersAwait <-chan any,
-	groundFloorItems <-chan hue.Item,
-	groundFloorErrors <-chan error,
-	groundFloorAwait <-chan any,
-	basementItems <-chan hue.Item,
-	basementErrors <-chan error,
-	basementAwait <-chan any,
-	quit <-chan any,
-
-) (
-
-	err error,
-
-) {
-
-	encoder := json.NewEncoder(output)
-	encoder.SetIndent("", "  ")
-
-	for {
-
-		select {
-
-		case groundFloorEvent := <-groundFloorItems:
-			_ = encoder.Encode(groundFloorEvent)
-
-		case e := <-groundFloorErrors:
-			err = e
-			return
-
-		case <-groundFloorAwait:
-			return
-
-		case basementEvent := <-basementItems:
-			_ = encoder.Encode(basementEvent)
-
-		case e := <-basementErrors:
-			err = e
-			return
-
-		case <-basementAwait:
-			return
-
-		case event := <-triggers:
-			fmt.Fprintf(output, "triggered %s @ %s\n", event, time.Now().Format(time.RFC850))
-
-		case <-triggersAwait:
-			return
-
-		case <-quit:
-			return
-		}
-	}
-}
-
 func onHueConnect(bridge hue.Bridge) {
 
-	fmt.Fprintf(output, "hue hub at %s connected @ %s\n", bridge.Label, time.Now().Format(time.RFC850))
+	fmt.Printf("hue hub at %s connected @ %s\n", bridge.Label, time.Now().Format(time.RFC850))
 }
 
 func onHueDisconnect(bridge hue.Bridge) {
 
 	err := fmt.Errorf("hue hub at %s disconnected @ %s", bridge.Label, time.Now().Format(time.RFC850))
-	fmt.Fprintln(output, err.Error())
-	os.Exit(10)
+	fmt.Fprintln(os.Stderr, err.Error())
+}
+
+func writeOuputJSON(filename string, object any) {
+
+	file, err := os.Create(filename)
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		return
+	}
+
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", " ")
+	err = encoder.Encode(object)
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+	}
 }

@@ -1,2 +1,3 @@
 automation_integration
-output.txt
+*.json
+*.txt
