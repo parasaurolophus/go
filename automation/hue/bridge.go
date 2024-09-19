@@ -45,6 +45,12 @@ type (
 	// not).
 	Model map[string]Group
 
+	// HTTP response payload structure
+	Response struct {
+		Data   []Item `json:"data"`
+		Errors []any  `json:"errors"`
+	}
+
 	// Fields of interest from the /resource/scene/{id} endpoint's response.
 	Scene struct {
 		Name string `json:"name"`
@@ -65,7 +71,7 @@ func NewBridge(label, address, key string) Bridge {
 // Send a PUT command to activate the given scene.
 func (bridge Bridge) Activate(scene Scene) (err error) {
 
-	uri := fmt.Sprintf("/resource/scene/%s", scene.Id)
+	uri := fmt.Sprintf("resource/scene/%s", scene.Id)
 	payload := map[string]any{"recall": map[string]any{"action": "active"}}
 	_, err = bridge.Send(http.MethodPut, uri, payload)
 	return
@@ -203,7 +209,7 @@ func (bridge Bridge) Model() (groups Model, err error) {
 // Send a PUT command to turn on or off the specified group.
 func (bridge Bridge) Put(group Group) (err error) {
 
-	uri := fmt.Sprintf("/resource/grouped_light/%s", group.GroupedLightId)
+	uri := fmt.Sprintf("resource/grouped_light/%s", group.GroupedLightId)
 
 	payload := map[string]any{
 		"on": map[string]any{

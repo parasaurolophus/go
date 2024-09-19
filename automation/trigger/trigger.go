@@ -119,13 +119,6 @@ func worker(
 		bedtimeTimer := time.NewTimer(time.Until(bedtimeTime))
 		nightTimer := time.NewTimer(time.Until(nightTime))
 
-		fmt.Printf("sunrise: %s\n", times[suncalc.Sunrise].Value.Local().Format(time.RFC850))
-		fmt.Printf("noon: %s\n", times[suncalc.SolarNoon].Value.Local().Format(time.RFC850))
-		fmt.Printf("sunset: %s\n", times[suncalc.Sunset].Value.Local().Format(time.RFC850))
-		fmt.Printf("evening: %s\n", times[suncalc.Night].Value.Local().Format(time.RFC850))
-		fmt.Printf("bedtime: %s\n", bedtimeTime.Format(time.RFC850))
-		fmt.Printf("night: %s\n", nightTime.Format(time.RFC850))
-
 	Today:
 		for {
 
@@ -134,60 +127,41 @@ func worker(
 			case <-sunriseTimer.C:
 				n := time.Now()
 				if n.Before(times[suncalc.Sunrise].Value.Add(time.Minute)) {
-					fmt.Printf("triggered %s @ %s\n", Sunrise, n.Format(time.RFC850))
 					triggers <- Sunrise
-				} else {
-					fmt.Printf("skipped %s @ %s\n", Sunrise, n.Format(time.RFC850))
 				}
 
 			case <-noonTimer.C:
 				n := time.Now()
 				if n.Before(times[suncalc.SolarNoon].Value.Add(time.Minute)) {
-					fmt.Printf("triggered %s @ %s\n", Noon, n.Format(time.RFC850))
 					triggers <- Noon
-				} else {
-					fmt.Printf("skipped %s @ %s\n", Noon, n.Format(time.RFC850))
 				}
 
 			case <-sunsetTimer.C:
 				n := time.Now()
 				if n.Before(times[suncalc.Sunset].Value.Add(time.Minute)) {
-					fmt.Printf("triggered %s @ %s\n", Sunset, n.Format(time.RFC850))
 					triggers <- Sunset
-				} else {
-					fmt.Printf("skipped %s @ %s\n", Sunset, n.Format(time.RFC850))
 				}
 
 			case <-bedtimeTimer.C:
 				n := time.Now()
 				if n.Before(bedtimeTime.Add(time.Minute)) {
-					fmt.Printf("triggered %s @ %s\n", Bedtime, n.Format(time.RFC850))
 					triggers <- Bedtime
-				} else {
-					fmt.Printf("skipped %s @ %s\n", Bedtime, n.Format(time.RFC850))
 				}
 
 			case <-eveningTimer.C:
 				n := time.Now()
 				if n.Before(times[suncalc.Night].Value.Add(time.Minute)) {
-					fmt.Printf("triggered %s @ %s\n", Evening, n.Format(time.RFC850))
 					triggers <- Evening
-				} else {
-					fmt.Printf("skipped %s @ %s\n", Evening, n.Format(time.RFC850))
 				}
 
 			case <-nightTimer.C:
 				n := time.Now()
 				if n.Before(nightTime.Add(time.Minute)) {
-					fmt.Printf("triggered %s @ %s\n", Night, n.Format(time.RFC850))
 					triggers <- Night
-				} else {
-					fmt.Printf("skipped %s @ %s\n", Night, n.Format(time.RFC850))
 				}
 				break Today
 
 			case <-terminate:
-				fmt.Printf("automation triggers worker thread terminated @ %s\n", time.Now().Format(time.RFC850))
 				return
 			}
 		}
