@@ -34,12 +34,15 @@ func main() {
 		return
 	}
 
+	///////////////////////////////////////////////////////////////////////////
+	// create a channel used to signal when the user has pressed the enter key
+
 	quit := make(chan any)
 
 	go func() {
 		buffer := []byte{0}
 		_, _ = os.Stdin.Read(buffer)
-		quit <- buffer[0]
+		close(quit)
 	}()
 
 	///////////////////////////////////////////////////////////////////////////
