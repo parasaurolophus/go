@@ -11,7 +11,7 @@ import (
 // returned wait group's counter will be set initially to the number of
 // goroutines specified by n. Each goroutine will decrement the returned wait
 // group's counter before terminating when the value channel to which it is
-// listening is closed. group's count. For example:
+// listening is closed. For example:
 //
 //	{
 //	  values, await := StartWorkers(numWorkers, bufferSize, handler)
